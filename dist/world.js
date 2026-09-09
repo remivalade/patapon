@@ -77,8 +77,32 @@ cyl(towerGroup,0,TOWER_HEIGHT/2,0,3.3,4,TOWER_HEIGHT,'#d1c19a',12);for(let y=5;y
 const count=1600,steps=new T.InstancedMesh(new T.BoxGeometry(4.5,.32,.93),mat('#c5b88e'),count),rail=new T.InstancedMesh(new T.CylinderGeometry(.065,.065,1.7,4),mat('#8d9b90'),count/4);for(let i=0;i<count;i++){const a=i/count*Math.PI*2*TOWER_TURNS;dummy.position.set(Math.cos(a)*8,i/count*TOWER_HEIGHT-.15,Math.sin(a)*8);dummy.scale.set(1,1,1);dummy.rotation.set(0,-a,0);dummy.updateMatrix();steps.setMatrixAt(i,dummy.matrix);if(i%4===0){dummy.position.set(Math.cos(a)*10.15,i/count*TOWER_HEIGHT+.7,Math.sin(a)*10.15);dummy.rotation.set(0,0,0);dummy.updateMatrix();rail.setMatrixAt(i/4,dummy.matrix);}}towerGroup.add(steps,rail);
 for(let turn=0;turn<TOWER_TURNS;turn++){const points=[];for(let i=0;i<=120;i++){const a=(i/120+turn)*Math.PI*2;points.push(new T.Vector3(Math.cos(a)*10.15,(i/120+turn)*TOWER_HEIGHT/TOWER_TURNS+1.5,Math.sin(a)*10.15));}mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),120,.085,4,false),mat('#8d9b90'),towerGroup);}
 cyl(towerGroup,0,TOWER_HEIGHT-.3,0,14,13,.6,'#adad93',32);
-const solarMat=new T.MeshBasicMaterial({color:'#ffe3a0',side:T.FrontSide,transparent:true,opacity:.95});const solar=mesh(new T.SphereGeometry(21,32,24),solarMat,world,...CENTER.toArray());solar.castShadow=false;
+const solarMat=new T.MeshBasicMaterial({color:'#fff2ce',side:T.FrontSide,transparent:true,opacity:.95,fog:false,depthWrite:false});const solar=mesh(new T.SphereGeometry(21,32,24),solarMat,world,...CENTER.toArray());solar.castShadow=false;
 const haloMat=new T.ShaderMaterial({uniforms:{tint:{value:new T.Color('#ffcf77')}},vertexShader:'varying vec3 n; varying vec3 v; void main(){vec4 p=modelViewMatrix*vec4(position,1.); n=normalize(normalMatrix*normal);v=normalize(-p.xyz);gl_Position=projectionMatrix*p;}',fragmentShader:'varying vec3 n; varying vec3 v; uniform vec3 tint; void main(){float f=pow(1.-abs(dot(normalize(n),normalize(v))),2.5);gl_FragColor=vec4(tint,f*.22);}',transparent:true,blending:T.AdditiveBlending,depthWrite:false,side:T.FrontSide});const halo=mesh(new T.SphereGeometry(28,32,24),haloMat,world,...CENTER.toArray());halo.castShadow=false;
+// Soft, depth-tested solar scattering: one billboard, no full-screen bloom pass.
+const glowUniforms={time:{value:0},strength:{value:1},tint:{value:new T.Color('#ffd28b')}};
+const glowMaterial=new T.ShaderMaterial({uniforms:glowUniforms,transparent:true,depthWrite:false,depthTest:true,blending:T.AdditiveBlending,toneMapped:false,
+vertexShader:'varying vec2 sunUv;void main(){sunUv=uv*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+fragmentShader:`varying vec2 sunUv;uniform float time;uniform float strength;uniform vec3 tint;
+void main(){float r=length(sunUv);float a=atan(sunUv.y,sunUv.x);float breathing=1.+.035*sin(time*.6);
+float glow=exp(-r*r*7.5)*.32;
+float corona=exp(-pow((r-.31)*10.,2.))*.10;
+float rays=pow(.5+.5*sin(a*12.+sin(a*5.-time*.09)*.8),12.);
+float streak=rays*exp(-r*3.7)*smoothstep(.24,.39,r)*.20;
+float edge=1.-smoothstep(.76,1.,r);
+float alpha=(glow+corona+streak)*edge*strength*breathing;
+gl_FragColor=vec4(tint,alpha);}`});
+const sunGlow=mesh(new T.PlaneGeometry(160,160),glowMaterial,world,...CENTER.toArray());sunGlow.castShadow=false;sunGlow.receiveShadow=false;sunGlow.renderOrder=4;
+// Small luminous motes move slowly around the artificial sun.
+const solarDustGeometry=new T.BufferGeometry(),solarDustPositions=[];
+for(let i=0;i<72;i++){const a=rand()*Math.PI*2,u=rand()*2-1,r=25+rand()*13;solarDustPositions.push(Math.sqrt(1-u*u)*Math.cos(a)*r,u*r,Math.sqrt(1-u*u)*Math.sin(a)*r);}
+solarDustGeometry.setAttribute('position',new T.Float32BufferAttribute(solarDustPositions,3));
+const solarDustMaterial=new T.ShaderMaterial({uniforms:{strength:glowUniforms.strength,time:glowUniforms.time},transparent:true,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false,
+vertexShader:'uniform float time;varying float sparkle;void main(){sparkle=.35+.35*sin(time*.8+position.x*.6+position.z);vec4 p=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*p;gl_PointSize=clamp(650./max(1.,-p.z),1.,4.);}',
+fragmentShader:'uniform float strength;varying float sparkle;void main(){float d=length(gl_PointCoord-.5)*2.;float a=(1.-smoothstep(.1,1.,d))*sparkle*strength;gl_FragColor=vec4(1.,.8,.43,a);}'});
+const solarDust=new T.Points(solarDustGeometry,solarDustMaterial);solarDust.position.copy(CENTER);world.add(solarDust);
+function updateSunEffects(t){glowUniforms.time.value=t;const distance=camera.position.distanceTo(CENTER);glowUniforms.strength.value=T.MathUtils.smoothstep(distance,30,85);sunGlow.visible=distance>30;sunGlow.quaternion.copy(camera.quaternion);halo.visible=distance>32;halo.scale.setScalar(1+Math.sin(t*.5)*.018);solarDust.rotation.y=t*.025;solarDust.rotation.z=Math.sin(t*.04)*.08;}
+
 const control=new T.Group();control.position.set(0,TOWER_HEIGHT,0);towerGroup.add(control);for(let i=0;i<8;i++){const a=i*Math.PI/4;const desk=new T.Group();desk.position.set(Math.cos(a)*10,0,Math.sin(a)*10);desk.rotation.y=-a-Math.PI/2;box(desk,0,1,0,3,2,1.6,'#6c8986');const screen=mesh(new T.BoxGeometry(2.5,.9,.08),mat('#9ee6c4','#497c66'),desk,0,1.8,.85);screen.rotation.x=-.4;for(let j=0;j<3;j++)ball(desk,-.7+j*.7,1.1,.86,.1,['#ebd089','#92c9b3','#e7a280'][j]);control.add(desk);}
 
 // Curved tunnel section: its entrance is aligned with the spherical meadow.
@@ -100,7 +124,7 @@ let mode='intro',startTime=0,pitch=.12,moving=0,walk=0,facing=Math.PI;const cloc
 function activeUp(){return climb?towerUp.clone():navNormal.clone().negate();}
 function turnView(angle){forward.applyAxisAngle(activeUp(),angle).normalize();}
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,1.65));renderer.setSize(innerWidth,innerHeight);}addEventListener('resize',resize);if(window.visualViewport)visualViewport.addEventListener('resize',resize);
-function interior(){world.visible=true;outside.visible=false;scene.background=new T.Color('#aabca0');scene.fog=new T.Fog('#b8c7a9',350,1450);}
+function interior(){world.visible=true;outside.visible=false;scene.background=new T.Color('#aabca0');scene.fog=new T.FogExp2('#ced8c8',.00205);}
 function beginWalk(){mode='walk';interior();player.visible=true;$('hud').hidden=false;$('intro').style.display='none';updateCamera(1);setTimeout(()=>$('lookhint').style.opacity='.2',7000);}
 $('enter').addEventListener('click',()=>{if(mode!=='intro')return;mode='approach';startTime=clock.elapsedTime;$('intro').style.opacity=0;$('intro').style.pointerEvents='none';});
 function clearInput(){keys.clear();joy.x=joy.y=0;joy.id=null;lookId=null;$('knob').style.transform='';}let lookId=null,lastX=0,lastY=0;
@@ -123,6 +147,6 @@ function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDel
 if(mode==='intro'){camera.up.set(0,1,0);camera.position.set(520+Math.sin(t*.07)*35,240,1040);camera.lookAt(0,30,0);}
 else if(mode==='approach'){const u=(t-startTime)/4.5;if(u<1){const s=u*u*(3-2*u);camera.position.set(520*(1-s),240*(1-s)+15*s,1040*(1-s)+294*s);camera.lookAt(0,15,276);$('fade').style.opacity=u>.85?String((u-.85)/.15):'0';}else{mode='tunnel';startTime=t;interior();$('fade').style.opacity='0';}}
 else if(mode==='tunnel'){const u=Math.min(1,(t-startTime)/6),s=u*u*(3-2*u);const tunnelQ=orientation(normalAt(0,118));camera.position.copy(new T.Vector3(0,4,35-s*73).applyQuaternion(tunnelQ).add(surfacePoint(0,118)));camera.up.copy(normalAt(0,118).negate());const target=surfacePoint(0,45,15);camera.lookAt(target);if(u>=1)beginWalk();}else move(dt);
-if(world.visible){bear.scale.y=1+Math.sin(t*1.3)*.018;ripples.forEach(r=>{const s=1+((t*.35+r.userData.phase)%3);r.scale.set(s*1.5,s,1);r.material.opacity=.15*(1-(s-1)/3);});waterMat.color.setHSL(.485+Math.sin(t*.3)*.008,.39,.5);}
+if(world.visible){updateSunEffects(t);bear.scale.y=1+Math.sin(t*1.3)*.018;ripples.forEach(r=>{const s=1+((t*.35+r.userData.phase)%3);r.scale.set(s*1.5,s,1);r.material.opacity=.15*(1-(s-1)/3);});waterMat.color.setHSL(.485+Math.sin(t*.3)*.008,.39,.5);}
 renderer.render(scene,camera);}
 animate();
