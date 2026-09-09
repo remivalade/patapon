@@ -1,0 +1,5 @@
+export const tower={x:0,z:-49,r:8,height:100,turns:4};
+export function ground(x,z){if(Math.abs(x)<15&&z>70)return 0;const r=Math.hypot(x,z);return Math.max(0,r-100)**2*.004;}
+export function stairHeight(x,z,currentY){const r=Math.hypot(x-tower.x,z-tower.z);if(r<5.5||r>10.6)return null;let a=Math.atan2(z-tower.z,x-tower.x);if(a<0)a+=Math.PI*2;let best=null,delta=Infinity;for(let turn=0;turn<=4;turn++){let h=(a/(Math.PI*2)+turn)*25;if(h>100.5)continue;const d=Math.abs(h-currentY);if(d<delta){best=h;delta=d;}}return delta<1.4?Math.min(100,best):null;}
+export function lakeContains(x,z){return ((x+29)/24)**2+((z+15)/32)**2<1;}
+export function resolveMove(x,z,y,oldX,oldZ){if(Math.hypot(x,z)>97)return null;const r=Math.hypot(x,z+49);const sy=stairHeight(x,z,y);if(sy!==null)return{x,z,y:sy};if(y>98.7&&r<13)return{x,z,y:100};if(y>1.4)return null;if(r<6)return null;if(lakeContains(x,z))return null;if(x>21&&x<38&&z>-13&&z<5)return null;if(((x-49)/12)**2+((z-20)/10)**2<1)return null;return{x,z,y:ground(x,z)};}
