@@ -24,5 +24,8 @@ export function createAmbience(){
     sun.gain.setTargetAtTime(inside?near(sunDistance,190)*.045:0,now,.5);
   }
   async function visibility(hidden){if(!context)return;try{if(hidden)await context.suspend();else if(!muted)await context.resume();}catch{}}
-  return{start,toggle,update,visibility,get muted(){return muted;}};
+  async function animal(kind){if(muted)return;if(!await start())return;const now=context.currentTime,duration=kind==='cow'?1.8:1.2;const oscillator=context.createOscillator(),envelope=context.createGain();oscillator.type='sawtooth';const base=kind==='cow'?100:230;oscillator.frequency.setValueAtTime(base*.8,now);oscillator.frequency.exponentialRampToValueAtTime(base*1.15,now+.3);oscillator.frequency.exponentialRampToValueAtTime(base*.72,now+duration);envelope.gain.setValueAtTime(0,now);envelope.gain.linearRampToValueAtTime(.13,now+.14);envelope.gain.setTargetAtTime(.001,now+duration*.6,.2);envelope.gain.linearRampToValueAtTime(0,now+duration);envelope.connect(master);
+ for(const [hz,weight] of (kind==='cow'?[[420,.7],[850,.3]]:[[700,.65],[1400,.2]])){const filter=context.createBiquadFilter(),gain=context.createGain();filter.type='bandpass';filter.frequency.value=hz;filter.Q.value=3;gain.gain.value=weight;oscillator.connect(filter);filter.connect(gain);gain.connect(envelope);}
+ const vibrato=context.createOscillator(),depth=context.createGain();vibrato.frequency.value=kind==='cow'?4:10;depth.gain.value=kind==='cow'?3:17;vibrato.connect(depth);depth.connect(oscillator.frequency);vibrato.start(now);oscillator.start(now);oscillator.stop(now+duration+.1);vibrato.stop(now+duration+.1);oscillator.onended=()=>{envelope.disconnect();};}
+ return{start,toggle,update,visibility,animal,get muted(){return muted;}};
 }
