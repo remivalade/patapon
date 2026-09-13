@@ -10,6 +10,7 @@
 - [ ] Speeder à l'inclinaison, avec recentrage
 - [ ] Speeder au-dessus des deux lacs
 - [ ] Vache et mouton : réaction au toucher, montée, saut, descente
+- [ ] Animal monté : il fonce tout seul, le frein le calme, il repart quand on lâche ; traits de vitesse et galop visibles, fluidité correcte
 - [ ] Pont et île
 - [ ] Ascenseur jusqu'à la salle du soleil et retour
 - [ ] Cycle jour/nuit visible
