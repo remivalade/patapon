@@ -1,8 +1,19 @@
 import * as T from './vendor/three.module.min.js';
 import { CENTER } from './navigation.js';
 import { daylightAt } from './landscape.js';
+// Sun colours selectable from the control box. sun: the sphere; halo and glow: the light
+// around it; light: the point light that shines on the habitat.
+export const SUN_COLOURS = [
+  { name: 'doré', sun: '#fff2ce', halo: '#ffcf77', glow: '#ffd28b', light: '#ffe3a4' },
+  { name: 'orange', sun: '#ffd9a8', halo: '#ff9a3c', glow: '#ffb060', light: '#ffcf8a' },
+  { name: 'rose', sun: '#ffd6e8', halo: '#ff7ab8', glow: '#ff9ccc', light: '#ffc4dc' },
+  { name: 'rouge', sun: '#ffc9b8', halo: '#ff5a48', glow: '#ff7a5c', light: '#ffb09c' },
+  { name: 'violet', sun: '#e6d4ff', halo: '#a66bff', glow: '#bf8cff', light: '#d9bdff' },
+  { name: 'bleu', sun: '#d2e8ff', halo: '#5aa8ff', glow: '#7dbcff', light: '#b8d6ff' },
+  { name: 'vert', sun: '#dcffd6', halo: '#5ee07a', glow: '#8cf0a0', light: '#c2f5c8' },
+];
 // The artificial sun at the centre of the globe: sphere, halo, glow, motes and its interior.
-export function buildSun({ world, mesh, rand, camera }) {
+export function buildSun({ world, mesh, rand, camera, lights }) {
   const solarMat = new T.MeshBasicMaterial({
     color: '#fff2ce',
     side: T.FrontSide,
@@ -70,7 +81,7 @@ gl_FragColor=vec4(tint,alpha);}`,
   }
   solarDustGeometry.setAttribute('position', new T.Float32BufferAttribute(solarDustPositions, 3));
   const solarDustMaterial = new T.ShaderMaterial({
-    uniforms: { strength: glowUniforms.strength, time: glowUniforms.time },
+    uniforms: { strength: glowUniforms.strength, time: glowUniforms.time, tint: glowUniforms.tint },
     transparent: true,
     depthWrite: false,
     blending: T.AdditiveBlending,
@@ -78,12 +89,24 @@ gl_FragColor=vec4(tint,alpha);}`,
     vertexShader:
       'uniform float time;varying float sparkle;void main(){sparkle=.35+.35*sin(time*.8+position.x*.6+position.z);vec4 p=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*p;gl_PointSize=clamp(650./max(1.,-p.z),1.,4.);}',
     fragmentShader:
-      'uniform float strength;varying float sparkle;void main(){float d=length(gl_PointCoord-.5)*2.;float a=(1.-smoothstep(.1,1.,d))*sparkle*strength;gl_FragColor=vec4(1.,.8,.43,a);}',
+      'uniform float strength;uniform vec3 tint;varying float sparkle;void main(){float d=length(gl_PointCoord-.5)*2.;float a=(1.-smoothstep(.1,1.,d))*sparkle*strength;gl_FragColor=vec4(tint*vec3(1.,.95,.75),a);}',
   });
   const solarDust = new T.Points(solarDustGeometry, solarDustMaterial);
   solarDust.position.copy(CENTER);
   world.add(solarDust);
-  function update(t, shadeDirection) {
+  let colourIndex = 0;
+  function setColour(index) {
+    colourIndex = ((index % SUN_COLOURS.length) + SUN_COLOURS.length) % SUN_COLOURS.length;
+    const c = SUN_COLOURS[colourIndex];
+    solarMat.color.set(c.sun);
+    haloMat.uniforms.tint.value.set(c.halo);
+    glowUniforms.tint.value.set(c.glow);
+    if (lights?.centralLight) lights.centralLight.color.set(c.light);
+  }
+  function nextColour() {
+    setColour(colourIndex + 1);
+  }
+  function update(t, shadeDirection, disco = 0) {
     sunInteriorUniforms.time.value = t;
     const inside = 1 - T.MathUtils.smoothstep(camera.position.distanceTo(CENTER), 18, 31);
     sunInteriorUniforms.strength.value = inside;
@@ -93,7 +116,8 @@ gl_FragColor=vec4(tint,alpha);}`,
     const distance = camera.position.distanceTo(CENTER);
     glowUniforms.strength.value =
       T.MathUtils.smoothstep(distance, 30, 85) *
-      (0.1 + 0.9 * daylightAt(camera.position.clone().sub(CENTER).normalize(), shadeDirection));
+      (0.1 + 0.9 * daylightAt(camera.position.clone().sub(CENTER).normalize(), shadeDirection)) *
+      (1 - 0.7 * disco);
     sunGlow.visible = distance > 30;
     sunGlow.quaternion.copy(camera.quaternion);
     halo.visible = distance > 32;
@@ -134,5 +158,20 @@ gl_FragColor=vec4(tint,alpha);}`,
   );
   sunCage.position.copy(CENTER);
   world.add(sunCage);
-  return { update, solarMat, halo, innerSun, sunCage, sunInteriorUniforms };
+  return {
+    update,
+    solarMat,
+    halo,
+    innerSun,
+    sunCage,
+    sunInteriorUniforms,
+    setColour,
+    nextColour,
+    get colour() {
+      return SUN_COLOURS[colourIndex];
+    },
+    get colourIndex() {
+      return colourIndex;
+    },
+  };
 }

@@ -6,6 +6,7 @@ import { buildForest, fieldDistance, groveAt } from './vegetation.js';
 import { placeOnGlobe } from './builders.js';
 import { buildVillage } from './village.js';
 import { buildSun } from './sun.js';
+import { buildSunPanel } from './sunpanel.js';
 import {
   RADIUS,
   CENTER,
@@ -186,7 +187,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   world.add(towerGroup);
   const expansion = buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, towerGroup });
   const landscape = buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions });
-  const sun = buildSun({ world, mesh, rand, camera });
+  const sun = buildSun({ world, mesh, rand, camera, lights: { ambient, centralLight } });
   const control = new T.Group();
   control.position.set(0, TOWER_HEIGHT, 0);
   towerGroup.add(control);
@@ -264,9 +265,12 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
     }),
   );
   world.add(pollen);
+  // The sun control box stands beside the lift call button.
+  const sunPanel = buildSunPanel({ towerGroup, builders });
   return {
     trees,
     forest,
+    sunPanel,
     lakeWater,
     distantWater,
     towerGroup,

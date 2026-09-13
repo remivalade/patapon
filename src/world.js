@@ -2,7 +2,8 @@ import * as T from './vendor/three.module.min.js';
 import { createAmbience } from './audio.js';
 import { SpeederHandling, WalkHandling, radialInput, MOUNTS } from './handling.js';
 import { TiltSteering } from './tilt.js';
-import { buildDayNight } from './landscape.js';
+import { buildDayNight, COVER_SPEEDS } from './landscape.js';
+import { PANEL_STAND, PANEL_FOCUS } from './sunpanel.js';
 import { buildFields, addWind, windTime } from './vegetation.js';
 import { buildTrailEffects, buildNightDetails } from './effects.js';
 import { createRandom, createBuilders } from './builders.js';
@@ -83,10 +84,11 @@ export function createGame({ renderer }) {
     pollen,
     ship,
     animatePatapon,
+    sunPanel,
   } = habitat;
   const { solarMat, halo, innerSun, sunCage, sunInteriorUniforms } = sun;
   function updateSunEffects(t) {
-    sun.update(t, dayNight.direction.value);
+    sun.update(t, dayNight.direction.value, dayNight.disco.value);
   }
   const { player, robe, legs, arms, playerShadow } = buildMarceau({ world, builders, rand });
   let navNormal = normalAt(0, 71),
@@ -121,6 +123,38 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       'diffuseColor.a*=pollenDay;\n#include <opaque_fragment>',
     );
   };
+  // The sun control box: where the player stands, what the camera looks at, what the
+  // buttons do. Opening it is a player mode; the buttons talk to the sun and the cover.
+  const panelStand = towerWorld(PANEL_STAND),
+    panelFocus = towerWorld(PANEL_FOCUS),
+    panelStandNormal = panelStand.clone().sub(CENTER).normalize();
+  function nearPanel() {
+    return player.position.distanceTo(panelStand) < 4.5;
+  }
+  function openPanel() {
+    navNormal = panelStandNormal.clone();
+    forward.copy(panelFocus).sub(panelStand).projectOnPlane(navNormal).normalize();
+    setMode({ type: 'panel' });
+    player.position.copy(surface(navNormal));
+    pitch = 0.12;
+  }
+  function closePanel() {
+    setMode({ type: 'walking' });
+  }
+  function pressPanel(kind) {
+    if (kind === 'color') {
+      sun.nextColour();
+      sunPanel.setColor(sun.colour.halo);
+    } else if (kind === 'speed') {
+      dayNight.setSpeedLevel((dayNight.level + 1) % COVER_SPEEDS.length);
+      sunPanel.setSpeedLevel(dayNight.level);
+    } else if (kind === 'disco') {
+      dayNight.setDisco(!dayNight.discoOn);
+      sunPanel.setDisco(dayNight.discoOn);
+    }
+  }
+  sunPanel.setColor(sun.colour.halo);
+  sunPanel.setSpeedLevel(dayNight.level);
   // The player is in exactly one mode. Every change goes through setMode, the single
   // place that performs the cleanup the previous mode needs and the setup the next one
   // needs. Jumping is not a mode: its height and velocity live alongside the mode and are
@@ -128,6 +162,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
   //   { type: 'walking' } | { type: 'swimming' }
   //   { type: 'riding', animal }   animal is null on the speeder
   //   { type: 'lift', climb }      climb: local tower coordinates and onPlatform
+  //   { type: 'panel' }            standing at the sun control box, first-person view
   let playerMode = { type: 'walking' };
   // Read-only mirrors of playerMode for the rest of this module, refreshed by setMode only.
   let riding = false,
@@ -152,6 +187,13 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     if (next.type === 'lift') {
       jumpHeight = jumpVelocity = 0;
       forward.projectOnPlane(towerUp).normalize();
+    }
+    if (previous.type === 'panel' && next.type !== 'panel') player.visible = true;
+    if (next.type === 'panel') {
+      clearInput();
+      jumpHeight = jumpVelocity = 0;
+      player.visible = false;
+      playerShadow.visible = false;
     }
     playerMode = next;
     riding = next.type === 'riding';
@@ -284,6 +326,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       phase !== 'walk' ||
       (riding && !mountedAnimal) ||
       swimming ||
+      playerMode.type === 'panel' ||
       jumpHeight > 0.01 ||
       (climb && expansion.lift.moving)
     )
@@ -368,9 +411,11 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     const choice = getContext();
     if (choice?.type === 'bike') bikeAction();
     else if (choice?.type === 'lift' || choice?.type === 'call') liftAction();
+    else if (choice?.type === 'panel') playerMode.type === 'panel' ? closePanel() : openPanel();
     else if (choice?.animal) mountAnimal(choice.animal);
   }
   function getContext() {
+    if (playerMode.type === 'panel') return { type: 'panel', text: 'Retour' };
     if (riding) return { type: 'bike', text: 'Descendre' };
     if (climb)
       return {
@@ -384,6 +429,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
             : 'Appeler',
         disabled: expansion.lift.moving,
       };
+    if (nearPanel()) return { type: 'panel', text: 'Interagir' };
     const local = towerLocal(player.position);
     if (Math.hypot(local.x, local.z) < 13 && Math.abs(local.y) < 5)
       return {
@@ -418,16 +464,25 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     $('accelerate').hidden = !riding || !!mountedAnimal;
     $('brake').hidden = $('tilt').hidden = !riding;
     $('recenter').hidden = !riding || !tilt.enabled;
-    $('stick').hidden = riding && tilt.enabled;
-    $('lookhint').hidden = riding && tilt.enabled;
+    const atPanel = playerMode.type === 'panel';
+    $('stick').hidden = (riding && tilt.enabled) || atPanel;
+    $('lookhint').hidden = (riding && tilt.enabled) || atPanel;
     $('drive-notice').hidden = !riding || !$('drive-notice').textContent;
-    $('jump').hidden = (riding && !mountedAnimal) || swimming || !!(climb && expansion.lift.moving);
+    $('jump').hidden =
+      (riding && !mountedAnimal) || swimming || atPanel || !!(climb && expansion.lift.moving);
   }
   function interactAt(x, y) {
     pointer.set((x / innerWidth) * 2 - 1, (-y / innerHeight) * 2 + 1);
     world.updateMatrixWorld(true);
     camera.updateMatrixWorld(true);
     raycaster.setFromCamera(pointer, camera);
+    if (playerMode.type === 'panel') {
+      const button = raycaster
+        .intersectObjects(sunPanel.targets, false)
+        .find((h) => h.distance < 8);
+      if (button) pressPanel(button.object.userData.panel);
+      return;
+    }
     const targets = [
       ...expansion.animals.map((a) => a.root),
       expansion.bike,
@@ -575,7 +630,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     stickOriginY = 0,
     stickMoved = false;
   function startStick(e, floating = false) {
-    if (joy.id !== null || (riding && tilt.enabled)) return;
+    if (joy.id !== null || (riding && tilt.enabled) || playerMode.type === 'panel') return;
     if (phase === 'reveal') beginWalk();
     e.preventDefault();
     joy.id = e.pointerId;
@@ -627,6 +682,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     if (phase === 'reveal') beginWalk();
     if (phase !== 'walk') return;
     if (
+      playerMode.type !== 'panel' &&
       !(riding && tilt.enabled) &&
       e.clientX < innerWidth * 0.44 &&
       e.clientY > innerHeight * 0.42
@@ -649,7 +705,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       updateJoy(e);
       return;
     }
-    if (e.pointerId !== lookId || (riding && tilt.enabled)) return;
+    if (e.pointerId !== lookId || (riding && tilt.enabled) || playerMode.type === 'panel') return;
     if (!lookMoved && Math.hypot(e.clientX - downX, e.clientY - downY) < 8) return;
     lookMoved = true;
     const sensitivity = (Math.PI * 0.65) / Math.min(innerWidth, innerHeight);
@@ -686,6 +742,11 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     if (phase === 'reveal') beginWalk();
     if (!e.repeat && e.key === ' ' && (!riding || mountedAnimal)) jump();
     if (!e.repeat && e.key.toLowerCase() === 'e') contextAction();
+    if (!e.repeat && playerMode.type === 'panel') {
+      if (e.key === 'Escape') closePanel();
+      const button = ['color', 'speed', 'disco'][Number(e.key) - 1];
+      if (button) pressPanel(button);
+    }
     keys.add(e.key.toLowerCase());
   });
   addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -702,6 +763,18 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
   function updateCamera(dt) {
     const up = activeUp();
     camera.up.copy(up);
+    if (playerMode.type === 'panel') {
+      // Face the panel from close by; step back just enough for it to fit on a narrow screen.
+      const back = panelStand.clone().sub(panelFocus).projectOnPlane(up).normalize();
+      const halfWidth = Math.tan(T.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
+      const distance = T.MathUtils.clamp(0.95 / halfWidth, 1.9, 3.6);
+      desired.copy(panelFocus).addScaledVector(back, distance).addScaledVector(up, 0.45);
+      camera.position.lerp(desired, 1 - Math.exp(-dt * 12));
+      camera.lookAt(panelFocus);
+      camera.fov = T.MathUtils.lerp(camera.fov, 59, Math.min(1, dt * 3));
+      camera.updateProjectionMatrix();
+      return;
+    }
     const eye = player.position.clone().addScaledVector(up, swimming ? 2.5 : 2.4);
     const view = forward
       .clone()
@@ -809,6 +882,12 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     }
   }
   function move(dt) {
+    if (playerMode.type === 'panel') {
+      expansion.updateLift(dt);
+      updateCamera(dt);
+      updateHud();
+      return;
+    }
     let side =
         joy.x +
         (keys.has('d') || keys.has('arrowright') ? 1 : 0) -
@@ -1209,6 +1288,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     liftAction,
     greetAnimal,
     getContext,
+    pressPanel,
     turnView,
     press,
     release,
@@ -1239,6 +1319,11 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       towerQ,
       updateSunEffects,
       updateWorld,
+      sun,
+      sunPanel,
+      panelStand,
+      panelFocus,
+      player,
       animalGround,
       hoverBase,
     },
