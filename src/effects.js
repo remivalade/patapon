@@ -117,7 +117,17 @@ export function buildTrailEffects(world, trees, rand) {
   function update(t, dt, state, shade, mist) {
     uniforms.shadeDirection.value.copy(shade);
     uniforms.mist.value.copy(mist);
-    const { normal: n, position, forward, riding, animal, jumpHeight, climb, mode } = state;
+    const {
+      normal: n,
+      position,
+      forward,
+      riding,
+      animal,
+      jumpHeight,
+      climb,
+      mode,
+      rush = 0,
+    } = state;
     const distance = lastNormal ? lastNormal.distanceTo(n) * RADIUS : 0,
       wet = lakeDepth(n) > 0.35 && bridgeHeight(n) < 0.1,
       active = mode === 'walk' && !climb;
@@ -141,7 +151,15 @@ export function buildTrailEffects(world, trees, rand) {
           else if (riding && !animal) {
             if (roadDistance(n) > 7) emit(n, contact, 2, 5, forward, 0.8);
             emit(n, contact, 0, 2, forward, 0.45);
-          } else emit(n, contact, 0, animal ? 5 : 2, forward, animal ? 0.75 : 0.4);
+          } else
+            emit(
+              n,
+              contact,
+              0,
+              animal ? 3 + Math.round(2 * rush) : 2,
+              forward,
+              animal ? 0.75 + 0.7 * rush : 0.4,
+            );
         }
       } else stride = 0;
     }

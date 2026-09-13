@@ -400,6 +400,51 @@ check('cow and sheep mount, gallop, tilt, jump, land and remain after dismount',
   }
 });
 
+check('mounted animals bolt on their own, slow only while braking, and gallop', () => {
+  const { expansion } = parts;
+  for (const kind of ['cow', 'sheep']) {
+    game.resetHome();
+    const a = expansion.animals.find((a) => a.kind === kind);
+    a.n = normalAt(73, 32);
+    a.root.position.copy(surface(a.n));
+    a.root.quaternion.copy(orientation(a.n));
+    game.place({ normal: a.n, position: surface(a.n) });
+    game.contextAction();
+    assert.equal(s().mountedAnimal, a);
+    assert.ok(s().speed > 10, 'The animal bolts at once');
+    game.updateHud();
+    assert.ok(hud('accelerate').hidden && !hud('brake').hidden, 'No accelerator on an animal');
+    const start = s().normal.clone();
+    let bounced = false;
+    steps(90);
+    for (let i = 0; i < 30; i++) {
+      game.step(0.016);
+      bounced ||= a.figure.position.y > 0.05;
+    }
+    assert.ok(s().speed > 48, `${kind} outruns the speeder without any input`);
+    assert.ok(start.distanceTo(s().normal) * RADIUS > 60, 'It really moves');
+    assert.ok(bounced, 'The gallop bounces the figure');
+    assert.ok(
+      s().rush > 0.9 && Number(hud('speed').style.opacity) > 0.9,
+      'Speed streaks at full rush',
+    );
+    hud('brake').pointerdown(touch(70, 750, 330));
+    steps(90);
+    assert.ok(s().speed < 0.5, 'Holding the brake calms it down');
+    assert.equal(Number(hud('speed').style.opacity), 0);
+    hud('brake').pointerup(touch(70, 750, 330));
+    steps(30);
+    assert.ok(s().speed > 15, 'It bolts again once the brake is released');
+    game.bikeAction();
+    assert.ok(!s().riding);
+    assert.equal(hud('speed').style.opacity, '0', 'Streaks vanish after dismount');
+    // Back to the meadow, so the next animal does not run into this one.
+    a.freeRoam = false;
+    expansion.updateAnimals(80, 0.016, s().position);
+    assert.ok(a.figure.position.y < 0.05, 'No gallop bounce once released');
+  }
+});
+
 check('walk across the elevated bridge without swimming', () => {
   // New lake water, exposed island, and dry bridge use the same terrain functions.
   game.resetHome();
