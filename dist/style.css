@@ -19,3 +19,6 @@
 .drive-mode[hidden],#stick[hidden],#lookhint[hidden],#drive-notice[hidden]{display:none}
 #drive-notice{position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);max-width:calc(100% - 48px);width:max-content;padding:12px 17px;border-radius:20px;background:#203b32eb;color:#fff8e4;font-size:14px;text-align:center;pointer-events:none}
 @media(orientation:landscape) and (max-height:550px){#hud{--pedal-bottom:max(22px,env(safe-area-inset-bottom));--pedal-height:62px;--pedal-gap:10px}#accelerate,#brake{width:90px;border-radius:22px}#hud.riding #action{top:max(20px,env(safe-area-inset-top));left:calc(max(20px,env(safe-area-inset-left)) + 66px);right:auto;height:52px;min-width:116px}#recenter{top:max(88px,calc(env(safe-area-inset-top) + 68px));left:calc(max(26px,env(safe-area-inset-left)) + 136px)}}
+
+#hud.animal-mounted #jump{right:calc(max(26px,env(safe-area-inset-right)) + 106px);width:64px;min-width:64px;height:64px}
+#hud.animal-mounted #stick{width:112px;height:112px}#hud.animal-mounted #knob{left:28px;top:28px}
