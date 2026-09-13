@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.min.js';
+import {addWind} from './vegetation.js';
 import {RADIUS,CENTER,TOWER_HEIGHT,ROAD_AXIS,MEADOW,roadNormal,normalAt,orientation,surface,surfacePoint,roadDistance,meadowDistance,roadOffset,lakeDepth} from './navigation.js';
 export function buildExpansion({world,mesh,mat,box,ball,cyl,beam,rand,towerGroup}){
  const dummy=new T.Object3D();
@@ -12,7 +13,7 @@ export function buildExpansion({world,mesh,mat,box,ball,cyl,beam,rand,towerGroup
  const mx=new T.Vector3(1,0,0).projectOnPlane(MEADOW).normalize(),mz=MEADOW.clone().cross(mx).normalize();
  function meadowNormal(x,z){return MEADOW.clone().multiplyScalar(RADIUS).addScaledVector(mx,x).addScaledVector(mz,z).normalize();}
  const flowerCount=1500,stems=new T.InstancedMesh(new T.CylinderGeometry(.035,.05,.55,4),mat('#63894c'),flowerCount),blooms=new T.InstancedMesh(new T.IcosahedronGeometry(.28,0),mat('#fff1b6'),flowerCount);
- for(let i=0;i<flowerCount;i++){const a=rand()*Math.PI*2,r=Math.sqrt(rand())*53,n=meadowNormal(Math.cos(a)*r,Math.sin(a)*r);if(roadDistance(n)<6){i--;continue;}dummy.quaternion.copy(orientation(n));dummy.position.copy(surface(n,.3));dummy.scale.setScalar(.75+rand()*.65);dummy.updateMatrix();stems.setMatrixAt(i,dummy.matrix);dummy.position.copy(surface(n,.65));dummy.scale.y=.4;dummy.updateMatrix();blooms.setMatrixAt(i,dummy.matrix);blooms.setColorAt(i,new T.Color(['#fff3bd','#ecc079','#eeb3c4','#bba8e6','#f0eee0'][i%5]));}world.add(stems,blooms);
+ for(let i=0;i<flowerCount;i++){const a=rand()*Math.PI*2,r=Math.sqrt(rand())*53,n=meadowNormal(Math.cos(a)*r,Math.sin(a)*r);if(roadDistance(n)<6){i--;continue;}dummy.quaternion.copy(orientation(n));dummy.position.copy(surface(n,.3));dummy.scale.setScalar(.75+rand()*.65);dummy.updateMatrix();stems.setMatrixAt(i,dummy.matrix);dummy.position.copy(surface(n,.65));dummy.scale.y=.4;dummy.updateMatrix();blooms.setMatrixAt(i,dummy.matrix);blooms.setColorAt(i,new T.Color(['#fff3bd','#ecc079','#eeb3c4','#bba8e6','#f0eee0'][i%5]));}addWind(stems.material,{amount:.08,base:-.275,height:.55});addWind(blooms.material,{amount:.08,whole:true});world.add(stems,blooms);
  const animals=[];function animal(kind,x,z,index){const root=new T.Group(),cow=kind==='cow',legs=[],head=new T.Group();root.userData.kind=kind;world.add(root);
  const body=ball(root,0,cow?1.6:1.1,0,1,cow?'#f6f0db':'#ece6d0',1);body.scale.set(cow?1: .7,cow?.82:.68,cow?1.7:1.08);
  if(cow){for(const [x,y,z,s] of [[.86,1.8,.1,.48],[-.83,1.7,-.65,.5],[.1,2.35,-.45,.5]]){const p=ball(root,x,y,z,s,'#4b5047',0);p.scale.set(.8,.7,1.2);}}

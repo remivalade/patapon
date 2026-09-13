@@ -7,7 +7,7 @@ export function shadeAt(t){return homeNormal.clone().negate().applyAxisAngle(cyc
 export function daylightAt(n,direction){return 1-T.MathUtils.smoothstep(n.dot(direction),-.16,.16);}
 
 export function buildLandscape({world,mesh,mat,ball,cyl,beam,collisions}){
- const bridgeSamples=[],scenery=new T.Group();world.add(scenery);
+ const bridgeSamples=[],lamps=[],scenery=new T.Group();world.add(scenery);
  // Railings, crossbeams and piers follow the same spherical bridge as the road.
  for(let i=0;i<720;i++){
   const n=roadNormal(i/720*Math.PI*2),next=roadNormal((i+1)/720*Math.PI*2),h=bridgeHeight(n);
@@ -23,13 +23,13 @@ export function buildLandscape({world,mesh,mat,ball,cyl,beam,collisions}){
    const edgeNext=next.clone().multiplyScalar(Math.cos(5.65/RADIUS)).addScaledVector(ROAD_AXIS,Math.sin(sign*5.65/RADIUS));
    const p=surface(edge,lakeDepth(edge)+h+1.35),p2=surface(edgeNext,lakeDepth(edgeNext)+bridgeHeight(next)+1.35);
    beam(scenery,p.toArray(),p2.toArray(),.1,'#dbc798');
-   if(i%3===0){const post=new T.Group();post.position.copy(surface(edge,lakeDepth(edge)+h));post.quaternion.copy(orientation(edge));scenery.add(post);cyl(post,0,.7,0,.11,.14,1.4,'#c6b18b',5);if(i%12===0)ball(post,0,1.6,0,.24,'#ffe6a6',1).material=mat('#ffe6a6','#c58b3c');}
+   if(i%3===0){const post=new T.Group();post.position.copy(surface(edge,lakeDepth(edge)+h));post.quaternion.copy(orientation(edge));scenery.add(post);cyl(post,0,.7,0,.11,.14,1.4,'#c6b18b',5);if(i%12===0){ball(post,0,1.6,0,.24,'#ffe6a6',1).material=mat('#ffe6a6','#c58b3c');lamps.push(surface(edge,lakeDepth(edge)+h+1.6));}}
   }
  }
  // A handful of distinct low-poly trees on the raised island.
  const islandTrees=[[35,8,1.25],[28,3,.95],[42,5,1.05],[33,17,.8],[44,15,.75],[28,13,.7]];
  for(const [x,z,s] of islandTrees){const n=bigLakeNormal(x,z),tree=new T.Group();tree.position.copy(surface(n));tree.quaternion.copy(orientation(n));scenery.add(tree);cyl(tree,0,2.1*s,0,.32*s,.6*s,4.2*s,'#795c3d',6);const crown=ball(tree,0,5.2*s,0,3*s,'#a8b965',1);crown.scale.y=1.2;collisions.add(n,.6*s,9*s);}
- batchStatic(scenery);return{bridgeSamples,island:ISLAND};
+ batchStatic(scenery);return{bridgeSamples,island:ISLAND,lamps};
 }
 
 export function buildDayNight({world,mesh,mat,beam,scene,waters}){
@@ -45,7 +45,8 @@ export function buildDayNight({world,mesh,mat,beam,scene,waters}){
  const patched=new Set();
  world.traverse(object=>{for(const material of Array.isArray(object.material)?object.material:[object.material]){
   if(!material?.isMeshStandardMaterial||patched.has(material))continue;patched.add(material);
-  material.onBeforeCompile=shader=>{
+  const previous=material.onBeforeCompile,inheritedKey=material.customProgramCacheKey();
+  material.onBeforeCompile=function(shader){previous.call(this,shader);
    shader.uniforms.shadeDirection=direction;shader.uniforms.solarCenter=center;
    shader.vertexShader='varying vec3 solarWorldPosition;\n'+shader.vertexShader;
    shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',`vec4 solarPosition=vec4(transformed,1.);
@@ -63,7 +64,7 @@ export function buildDayNight({world,mesh,mat,beam,scene,waters}){
    reflectedLight.indirectDiffuse*=mix(vec3(1.),vec3(.13,.22,.4),shade);
    reflectedLight.indirectSpecular*=1.-shade*.8;`);
   };
-  material.customProgramCacheKey=()=> 'patapon-moving-solar-cover-v1';material.needsUpdate=true;
+  material.customProgramCacheKey=()=> inheritedKey+'-patapon-moving-solar-cover-v1';material.needsUpdate=true;
  }});
  const dayFog=new T.Color('#ced8c8'),nightFog=new T.Color('#15283f'),dayBackground=new T.Color('#aabca0'),nightBackground=new T.Color('#15263c');
  function update(t,playerPosition){direction.value.copy(shadeAt(t));cap.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.value);
