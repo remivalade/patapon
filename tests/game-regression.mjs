@@ -98,6 +98,19 @@ check('jump and landing', () => {
   assert.ok(max > 1.5 && s().jumpHeight === 0, 'Jump and landing');
 });
 
+check('landing cloud through the real game loop', () => {
+  // The loop hands the effects the live player state, including the experience phase.
+  const { trailEffects, updateWorld } = parts;
+  game.resetHome();
+  const before = trailEffects.stats.landings;
+  game.jump();
+  for (let i = 1; i <= 150; i++) {
+    game.step(0.016);
+    updateWorld(i * 0.016, 0.016);
+  }
+  assert.equal(trailEffects.stats.landings, before + 1);
+});
+
 check('swim and leave lake', () => {
   const n = normalAt(-29, -15);
   game.place({ normal: n, position: surface(n) });
@@ -432,6 +445,50 @@ check('swim and use speeder on the large lake', () => {
   game.bikeAction();
   game.step(0.016);
   assert.ok(s().swimming);
+});
+
+check('one player mode at a time, with coherent transitions', () => {
+  // The mirrors riding/swimming/mountedAnimal/climb always agree with the single mode.
+  const agree = () => {
+    const { mode, riding, swimming, mountedAnimal, climb } = s();
+    assert.equal(riding, mode === 'riding');
+    assert.equal(swimming, mode === 'swimming');
+    assert.ok(!mountedAnimal || mode === 'riding');
+    assert.equal(!!climb, mode === 'lift');
+    return mode;
+  };
+  game.resetHome();
+  assert.equal(agree(), 'walking');
+  const bike = parts.expansion.bike.position.clone().sub(CENTER).normalize();
+  game.place({ normal: bike, position: surface(bike) });
+  game.bikeAction();
+  assert.equal(agree(), 'riding');
+  game.liftAction();
+  assert.equal(agree(), 'riding', 'The lift is refused while riding');
+  game.jump();
+  assert.equal(s().jumpVelocity, 0, 'No jump on the speeder');
+  game.bikeAction();
+  assert.equal(agree(), 'walking');
+  const lake = normalAt(-29, -15);
+  game.place({ normal: lake, position: surface(lake) });
+  game.step(0.016);
+  assert.equal(agree(), 'swimming');
+  game.jump();
+  assert.equal(s().jumpVelocity, 0, 'No jump while swimming');
+  game.resetHome();
+  const tower = normalAt(8, -49);
+  game.place({ normal: tower, position: surface(tower) });
+  game.liftAction();
+  assert.equal(agree(), 'lift');
+  assert.ok(s().climb.onPlatform);
+  game.bikeAction();
+  assert.equal(agree(), 'lift', 'The speeder is refused on the lift');
+  game.jump();
+  steps(30);
+  assert.equal(agree(), 'lift', 'Jumping on the platform keeps the lift mode');
+  game.resetHome();
+  assert.equal(agree(), 'walking');
+  assert.equal(s().jumpHeight, 0);
 });
 
 check(

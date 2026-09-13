@@ -90,8 +90,7 @@ export function createGame({ renderer }) {
   }
   const { player, robe, legs, arms, playerShadow } = buildMarceau({ world, builders, rand });
   let navNormal = normalAt(0, 71),
-    forward = new T.Vector3(0, 0, -1).projectOnPlane(navNormal).normalize(),
-    climb = null;
+    forward = new T.Vector3(0, 0, -1).projectOnPlane(navNormal).normalize();
   addWind(mat('#a8b965'), { worldSpace: true });
   addWind(flowers.material, { whole: true, amount: 0.055 });
   const fields = buildFields(world, rand);
@@ -122,14 +121,47 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       'diffuseColor.a*=pollenDay;\n#include <opaque_fragment>',
     );
   };
-  let mountedAnimal = null;
+  // The player is in exactly one mode. Every change goes through setMode, the single
+  // place that performs the cleanup the previous mode needs and the setup the next one
+  // needs. Jumping is not a mode: its height and velocity live alongside the mode and are
+  // allowed while walking or riding an animal.
+  //   { type: 'walking' } | { type: 'swimming' }
+  //   { type: 'riding', animal }   animal is null on the speeder
+  //   { type: 'lift', climb }      climb: local tower coordinates and onPlatform
+  let playerMode = { type: 'walking' };
+  // Read-only mirrors of playerMode for the rest of this module, refreshed by setMode only.
   let riding = false,
     swimming = false,
-    jumpHeight = 0,
+    mountedAnimal = null,
+    climb = null;
+  let jumpHeight = 0,
     jumpVelocity = 0;
+  function setMode(next) {
+    const previous = playerMode;
+    if (previous.type === 'riding' && next.type !== 'riding') {
+      if (previous.animal) releaseAnimal(previous.animal);
+      if (tilt.state === 'waiting') tilt.stop();
+      clearInput();
+      jumpHeight = jumpVelocity = 0;
+    }
+    if (next.type === 'riding' && previous.type !== 'riding') {
+      clearInput();
+      jumpHeight = jumpVelocity = 0;
+      if (next.animal) next.animal.ridden = next.animal.freeRoam = true;
+    }
+    if (next.type === 'lift') {
+      jumpHeight = jumpVelocity = 0;
+      forward.projectOnPlane(towerUp).normalize();
+    }
+    playerMode = next;
+    riding = next.type === 'riding';
+    swimming = next.type === 'swimming';
+    mountedAnimal = riding ? next.animal : null;
+    climb = next.type === 'lift' ? next.climb : null;
+  }
   player.position.copy(surface(navNormal));
   player.visible = false;
-  let mode = 'intro',
+  let phase = 'intro',
     startTime = 0,
     pitch = 0.12,
     moving = 0,
@@ -175,7 +207,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     scene.fog = new T.FogExp2('#ced8c8', 0.00205);
   }
   function beginWalk() {
-    mode = 'walk';
+    phase = 'walk';
     pitch = 0.12;
     interior();
     player.visible = true;
@@ -189,7 +221,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       beginWalk();
       return;
     }
-    mode = 'reveal';
+    phase = 'reveal';
     startTime = t;
     player.visible = true;
     player.quaternion.copy(orientation(navNormal));
@@ -213,16 +245,13 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     stickElement.style.bottom = '';
   }
   function resetHome() {
-    releaseAnimal();
+    setMode({ type: 'walking' });
     if (tilt.state === 'waiting') tilt.stop();
-    if (mode === 'reveal') beginWalk();
+    if (phase === 'reveal') beginWalk();
     clearInput();
     const parked = normalAt(64, 10);
     expansion.bike.position.copy(surface(parked, 1));
     expansion.bike.quaternion.copy(orientation(parked));
-    riding = false;
-    climb = null;
-    swimming = false;
     jumpHeight = jumpVelocity = 0;
     navNormal = normalAt(28, 12);
     forward.set(0, 0, -1).projectOnPlane(navNormal).normalize();
@@ -231,9 +260,9 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     updateCamera(1);
   }
   function jump() {
-    if (mode === 'reveal') beginWalk();
+    if (phase === 'reveal') beginWalk();
     if (
-      mode !== 'walk' ||
+      phase !== 'walk' ||
       (riding && !mountedAnimal) ||
       swimming ||
       jumpHeight > 0.01 ||
@@ -247,9 +276,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     const lift = expansion.lift;
     if (lift.moving) return;
     if (!climb && lift.height < 0.1) {
-      climb = { x: 0, z: 0, y: 0, onPlatform: true };
-      jumpHeight = jumpVelocity = 0;
-      forward.projectOnPlane(towerUp).normalize();
+      setMode({ type: 'lift', climb: { x: 0, z: 0, y: 0, onPlatform: true } });
       player.position.copy(towerWorld(climb));
     }
     if (climb && Math.hypot(climb.x, climb.z) < 5.7) {
@@ -268,13 +295,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
         if (!surfaceBlocked(resolved, 0.6) && towerAllows(resolved)) {
           navNormal = resolved;
           forward.projectOnPlane(navNormal).normalize();
-          releaseAnimal();
-          riding = false;
-          clearInput();
-          if (tilt.state === 'waiting') tilt.stop();
-          drive.reset();
-          walkHandling.reset();
-          jumpHeight = jumpVelocity = 0;
+          setMode({ type: 'walking' });
           player.position.copy(surface(navNormal));
           return;
         }
@@ -282,39 +303,27 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       return;
     }
     if (player.position.distanceTo(expansion.bike.position) > 8) return;
-    clearInput();
-    riding = true;
     navNormal = expansion.bike.position.clone().sub(CENTER).normalize();
     forward
       .set(0, 0, 1)
       .applyQuaternion(expansion.bike.quaternion)
       .projectOnPlane(navNormal)
       .normalize();
+    setMode({ type: 'riding', animal: null });
     bikeHeading.copy(forward);
-    drive.reset();
-    walkHandling.reset();
-    swimming = false;
-    jumpHeight = jumpVelocity = 0;
   }
-  function releaseAnimal() {
-    if (!mountedAnimal) return;
-    const a = mountedAnimal;
+  // A released animal stays where it was ridden, facing the last heading.
+  function releaseAnimal(a) {
     a.ridden = false;
     a.freeRoam = true;
     const local = bikeHeading.clone().applyQuaternion(orientation(a.n).invert());
     a.angle = Math.atan2(local.x, local.z);
-    mountedAnimal = null;
   }
   function mountAnimal(a) {
     if (riding || climb || player.position.distanceTo(a.root.position) > 8) return;
-    clearInput();
-    mountedAnimal = a;
-    a.ridden = a.freeRoam = true;
-    riding = true;
-    swimming = false;
-    jumpHeight = jumpVelocity = 0;
     navNormal = a.n.clone();
     forward.set(0, 0, 1).applyQuaternion(a.root.quaternion).projectOnPlane(navNormal).normalize();
+    setMode({ type: 'riding', animal: a });
     bikeHeading.copy(forward);
     greetAnimal(a);
   }
@@ -328,8 +337,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     ambience.animal(a.kind);
   }
   function contextAction() {
-    if (mode === 'reveal') beginWalk();
-    if (mode !== 'walk') return;
+    if (phase === 'reveal') beginWalk();
+    if (phase !== 'walk') return;
     const choice = getContext();
     if (choice?.type === 'bike') bikeAction();
     else if (choice?.type === 'lift' || choice?.type === 'call') liftAction();
@@ -417,9 +426,9 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     $('sound').classList.toggle('muted', muted);
   });
   $('enter').addEventListener('click', () => {
-    if (mode !== 'intro') return;
+    if (phase !== 'intro') return;
     ambience.start();
-    mode = 'approach';
+    phase = 'approach';
     startTime = clock.elapsedTime;
     $('intro').style.opacity = 0;
     $('intro').style.pointerEvents = 'none';
@@ -540,7 +549,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     stickMoved = false;
   function startStick(e, floating = false) {
     if (joy.id !== null || (riding && tilt.enabled)) return;
-    if (mode === 'reveal') beginWalk();
+    if (phase === 'reveal') beginWalk();
     e.preventDefault();
     joy.id = e.pointerId;
     stickMoved = false;
@@ -588,8 +597,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
   for (const evt of ['pointerup', 'pointercancel', 'lostpointercapture'])
     stick.addEventListener(evt, (e) => stopStick(e));
   renderer.domElement.addEventListener('pointerdown', (e) => {
-    if (mode === 'reveal') beginWalk();
-    if (mode !== 'walk') return;
+    if (phase === 'reveal') beginWalk();
+    if (phase !== 'walk') return;
     if (
       !(riding && tilt.enabled) &&
       e.clientX < innerWidth * 0.44 &&
@@ -647,7 +656,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
   addEventListener('keydown', (e) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key))
       e.preventDefault();
-    if (mode === 'reveal') beginWalk();
+    if (phase === 'reveal') beginWalk();
     if (!e.repeat && e.key === ' ' && (!riding || mountedAnimal)) jump();
     if (!e.repeat && e.key.toLowerCase() === 'e') contextAction();
     keys.add(e.key.toLowerCase());
@@ -842,7 +851,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
         if (r > 8.8 && x > 5 && Math.abs(z) < 2.6) {
           navNormal = towerWorld({ x, y: 0, z }).sub(CENTER).normalize();
           forward.projectOnPlane(navNormal).normalize();
-          climb = null;
+          setMode({ type: 'walking' });
         }
       }
       if (climb) player.position.copy(towerWorld(climb)).addScaledVector(towerUp, jumpHeight);
@@ -888,7 +897,9 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
         moving = Math.hypot(motion.side, motion.ahead);
       }
       const depth = lakeDepth(navNormal);
-      swimming = !riding && depth > 1.2 && bridgeHeight(navNormal) < 0.1 && jumpHeight < 0.3;
+      const deep = !riding && depth > 1.2 && bridgeHeight(navNormal) < 0.1 && jumpHeight < 0.3;
+      if (deep && playerMode.type === 'walking') setMode({ type: 'swimming' });
+      else if (!deep && playerMode.type === 'swimming') setMode({ type: 'walking' });
       const waterHeight =
         roadOffset(navNormal) > 0
           ? roadOffset(navNormal)
@@ -906,8 +917,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
           Math.hypot(local.x, local.z) < 5.8 &&
           expansion.lift.height < 0.1
         ) {
-          climb = { x: local.x, z: local.z, y: 0, onPlatform: true };
-          forward.projectOnPlane(towerUp).normalize();
+          setMode({ type: 'lift', climb: { x: local.x, z: local.z, y: 0, onPlatform: true } });
         }
       }
     }
@@ -1006,11 +1016,11 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.045),
       t = clock.elapsedTime;
-    if (mode === 'intro') {
+    if (phase === 'intro') {
       camera.up.set(0, 1, 0);
       camera.position.set(520 + Math.sin(t * 0.07) * 40, 240, 1040);
       camera.lookAt(0, 30, 0);
-    } else if (mode === 'approach') {
+    } else if (phase === 'approach') {
       const u = (t - startTime) / 4.5;
       if (u < 1) {
         const s = u * u * (3 - 2 * u);
@@ -1018,12 +1028,12 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
         camera.lookAt(0, 15, 276);
         $('fade').style.opacity = u > 0.85 ? String((u - 0.85) / 0.15) : '0';
       } else {
-        mode = 'tunnel';
+        phase = 'tunnel';
         startTime = t;
         interior();
         $('fade').style.opacity = '0';
       }
-    } else if (mode === 'tunnel') {
+    } else if (phase === 'tunnel') {
       const u = Math.min(1, (t - startTime) / 6),
         s = u * u * (3 - 2 * u);
       const tunnelQ = orientation(normalAt(0, 118));
@@ -1033,7 +1043,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       camera.up.copy(normalAt(0, 118).negate());
       camera.lookAt(surfacePoint(0, 45, 15));
       if (u >= 1) beginReveal(t);
-    } else if (mode === 'reveal') {
+    } else if (phase === 'reveal') {
       const u = t - startTime,
         smooth = (v) => {
           v = T.MathUtils.clamp(v, 0, 1);
@@ -1048,39 +1058,41 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       updateCamera(dt);
       if (u >= 7) beginWalk();
     } else move(dt);
-    if (world.visible) {
-      dayNight.update(t, player.position);
-      fields.update(t, player.position, dayNight.direction.value);
-      nightDetails.update(t, player.position, dayNight.direction.value);
-      trailEffects.update(
-        t,
-        dt,
-        {
-          normal: navNormal,
-          position: player.position,
-          forward,
-          riding,
-          animal: mountedAnimal,
-          jumpHeight,
-          climb,
-          mode,
-        },
-        dayNight.direction.value,
-        lakeWater.uniforms.mist.value,
-      );
-      updateSunEffects(t);
-      animatePatapon(t, dt, player.position, activeUp(), mode === 'walk');
-      expansion.updateAnimals(t, dt, player.position);
-      lakeWater.uniforms.time.value = distantWater.uniforms.time.value = t;
-      ambience.update(
-        t,
-        player.position.distanceTo(surfacePoint(-29, -15)),
-        riding && !mountedAnimal ? 0 : player.position.distanceTo(ship.position),
-        player.position.distanceTo(CENTER),
-        mode === 'walk' || mode === 'reveal',
-      );
-    }
+    if (world.visible) updateWorld(t, dt);
     renderer.render(scene, camera);
+  }
+  // Everything that lives in the habitat advances here, after the player has moved.
+  function updateWorld(t, dt) {
+    dayNight.update(t, player.position);
+    fields.update(t, player.position, dayNight.direction.value);
+    nightDetails.update(t, player.position, dayNight.direction.value);
+    trailEffects.update(
+      t,
+      dt,
+      {
+        normal: navNormal,
+        position: player.position,
+        forward,
+        riding,
+        animal: mountedAnimal,
+        jumpHeight,
+        climb,
+        mode: phase,
+      },
+      dayNight.direction.value,
+      lakeWater.uniforms.mist.value,
+    );
+    updateSunEffects(t);
+    animatePatapon(t, dt, player.position, activeUp(), phase === 'walk');
+    expansion.updateAnimals(t, dt, player.position);
+    lakeWater.uniforms.time.value = distantWater.uniforms.time.value = t;
+    ambience.update(
+      t,
+      player.position.distanceTo(surfacePoint(-29, -15)),
+      riding && !mountedAnimal ? 0 : player.position.distanceTo(ship.position),
+      player.position.distanceTo(CENTER),
+      phase === 'walk' || phase === 'reveal',
+    );
   }
 
   function start() {
@@ -1103,13 +1115,15 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     if (options.forward) forward.copy(options.forward);
     if (options.position) player.position.copy(options.position);
     if (options.heading) bikeHeading.copy(options.heading);
-    if (options.riding !== undefined) riding = options.riding;
+    if (options.riding !== undefined && options.riding !== riding)
+      setMode(options.riding ? { type: 'riding', animal: null } : { type: 'walking' });
     if (options.speed !== undefined) drive.speed = options.speed;
     if (options.lastLookTime !== undefined) lastLookTime = options.lastLookTime;
   }
   function state() {
     return {
-      mode,
+      phase,
+      mode: playerMode.type,
       riding,
       swimming,
       mountedAnimal,
@@ -1173,6 +1187,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       sunInteriorUniforms,
       towerQ,
       updateSunEffects,
+      updateWorld,
       animalGround,
       hoverBase,
     },

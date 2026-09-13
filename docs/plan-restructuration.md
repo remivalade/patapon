@@ -30,7 +30,9 @@ Ensuite, retour aux nouveautés pour Marceau.
 - Étape 1 terminée : version de référence `9873a01`, formatage Prettier vérifié par captures d'écran identiques, checklist ajoutée.
 - Étape 2 terminée : `world.js` expose `createGame({ renderer })`, `main.js` démarre le jeu dans le navigateur, `tests/harness.mjs` crée une partie simulée. Les 26 vérifications passent par cette porte d'entrée, sans lire le texte de `world.js`.
 - Étape 3 terminée : la construction du monde est sortie de `world.js` vers `builders.js`, `exterior.js`, `habitat.js`, `village.js`, `sun.js` et `marceau.js`, sans changer les calculs ni l'ordre. Une empreinte de toute la scène (positions, matrices, géométries) est identique avant et après. `world.js` garde l'état du joueur, les commandes, la caméra et la boucle. Premier jalon d'essais téléphone à faire.
-- Étape 4 : à faire.
+- Étape 4 terminée : le joueur a un mode unique (`walking`, `swimming`, `riding` avec ou sans animal, `lift`) et une seule fonction `setMode` réalise toutes les transitions et leurs nettoyages. Les anciens booléens sont des miroirs en lecture, écrits uniquement par `setMode`. La phase de l'expérience est une variable séparée, `phase`. Une vérification dédiée à la cohérence des modes s'ajoute aux 26 existantes. Seule différence volontaire : monter sur la plateforme de l'ascenseur annule toujours un reste de saut, y compris quand on y marche (moins de 5 cm auparavant). Second jalon d'essais téléphone à faire.
+
+Les trois critères de fin sont atteints. Le chantier de restructuration est clos ; retour aux nouveautés pour Marceau après les essais téléphone.
 
 ## Précisions
 
