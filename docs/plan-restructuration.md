@@ -1,6 +1,6 @@
 # Plan de restructuration du code
 
-Statut : retenu. Version de référence : tag `v0.9-reference`.
+Statut : retenu. Version de référence : commit `9873a01` (à taguer `v0.9-reference` sur GitHub).
 
 ## Objectif
 
