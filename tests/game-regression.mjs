@@ -1,0 +1,620 @@
+// Régression logique : vraies mathématiques Three.js, DOM et moteur WebGL simulés.
+// Ne remplace pas une validation visuelle ni un essai sur téléphone.
+// Les vérifications passent uniquement par la porte d'entrée de `createGame`
+// (commandes, `place`, `state`, `parts`) : elles survivent aux déplacements de code.
+import assert from 'node:assert/strict';
+import * as T from '../src/vendor/three.module.min.js';
+import { createTestGame, touch } from './harness.mjs';
+import {
+  RADIUS,
+  CENTER,
+  TOWER_HEIGHT,
+  ROAD_AXIS,
+  normalAt,
+  chart,
+  surface,
+  surfacePoint,
+  orientation,
+  advanceFrame,
+  lakeRadius,
+  lakeDepth,
+  roadDistance,
+  bigLakeRadius,
+  roadOffset,
+  islandDistance,
+} from '../src/navigation.js';
+import { daylightAt } from '../src/landscape.js';
+
+const { game, renderer, canvas, hud } = await createTestGame();
+const { parts } = game;
+const s = () => game.state();
+const ahead = (n) => new T.Vector3(0, 0, -1).projectOnPlane(n).normalize();
+// Place the player on the speeder at a given spot, as the older checks did by hand.
+function ride(n, speed, extra = {}) {
+  const f = ahead(n);
+  game.place({ normal: n, forward: f, heading: f, riding: true, speed, ...extra });
+}
+function steps(count, dt = 0.016) {
+  for (let i = 0; i < count; i++) game.step(dt);
+}
+
+// One rendered frame: every position and vertex must be finite.
+game.start();
+let meshes = 0,
+  triangles = 0;
+renderer.captured.traverse((o) => {
+  if (o.geometry) {
+    meshes++;
+    if (!o.isPoints)
+      triangles +=
+        ((o.geometry.index?.count || o.geometry.attributes.position.count) / 3) * (o.count || 1);
+  }
+});
+console.log({ meshes, triangles });
+
+// The checks run in order: several of them continue from the previous situation.
+const results = [];
+const checks = [];
+const check = (name, run) => checks.push({ name, run });
+
+check('full-speed road circuit', () => {
+  game.beginWalk();
+  parts.expansion.updateAnimals(0, 0.01, s().position);
+  const n = normalAt(73, 32);
+  ride(n, 48, { position: surface(n) });
+  const start = n.clone();
+  game.press('w');
+  const frames = 2400,
+    dt = (2 * Math.PI * RADIUS) / 48 / frames;
+  steps(frames, dt);
+  game.releaseKeys();
+  assert.ok(s().normal.distanceTo(start) < 0.004, 'Speeder full road circuit');
+  game.place({ riding: false });
+});
+
+check('tree and rock collisions', () => {
+  const { collisions } = parts;
+  const obstacle = collisions.objects[0];
+  const tangent = new T.Vector3(1, 0, 0).projectOnPlane(obstacle.n).normalize();
+  const inside = obstacle.n
+    .clone()
+    .addScaledVector(tangent, 0.2 / RADIUS)
+    .normalize();
+  const out = collisions.resolve(inside, 0.62, 0);
+  assert.ok(out.distanceTo(obstacle.n) * RADIUS >= obstacle.radius + 0.6, 'Tree collision');
+  const big = collisions.objects.find((c) => c.radius > 8);
+  const bounced = collisions.resolve(big.n, 0.62, 0);
+  assert.ok(bounced.distanceTo(big.n) * RADIUS >= big.radius + 0.55, 'Rock collision');
+});
+
+check('jump and landing', () => {
+  game.resetHome();
+  game.jump();
+  let max = 0;
+  for (let i = 0; i < 150; i++) {
+    game.step(0.016);
+    max = Math.max(max, s().jumpHeight);
+  }
+  assert.ok(max > 1.5 && s().jumpHeight === 0, 'Jump and landing');
+});
+
+check('swim and leave lake', () => {
+  const n = normalAt(-29, -15);
+  game.place({ normal: n, position: surface(n) });
+  game.step(0.016);
+  assert.ok(s().swimming, 'Swimming entry');
+  assert.ok(s().position.distanceTo(CENTER) < RADIUS + 1.3, 'Waterline');
+  game.place({ normal: normalAt(0, 30) });
+  game.step(0.016);
+  assert.ok(!s().swimming, 'Swimming exit');
+});
+
+check('lift up, down and disembark', () => {
+  game.resetHome();
+  const n = normalAt(8, -49);
+  game.place({ normal: n, position: surface(n) });
+  game.liftAction();
+  assert.ok(s().climb?.onPlatform);
+  steps(700);
+  assert.equal(parts.expansion.lift.height, TOWER_HEIGHT);
+  assert.equal(s().climb.y, TOWER_HEIGHT);
+  game.liftAction();
+  steps(700);
+  assert.equal(parts.expansion.lift.height, 0);
+  game.place({ forward: new T.Vector3(1, 0, 0).applyQuaternion(parts.towerQ) });
+  game.press('w');
+  steps(120);
+  game.releaseKeys();
+  assert.equal(s().climb, null, 'Leave elevator at ground');
+});
+
+check('mount and dismount speeder', () => {
+  game.resetHome();
+  const n = parts.expansion.bike.position.clone().sub(CENTER).normalize();
+  game.place({ normal: n, position: surface(n) });
+  game.bikeAction();
+  assert.ok(s().riding);
+  game.bikeAction();
+  assert.ok(!s().riding);
+});
+
+check('cow and sheep interaction', () => {
+  const { camera, world, expansion } = parts;
+  const cow = expansion.animals.find((a) => a.kind === 'cow');
+  world.updateMatrixWorld(true);
+  const cowUp = cow.n.clone().negate(),
+    cowFront = new T.Vector3(0, 0, 1).applyQuaternion(cow.root.quaternion);
+  const cowHead = cow.head.getWorldPosition(new T.Vector3());
+  camera.position.copy(cowHead).addScaledVector(cowFront, 8).addScaledVector(cowUp, 1);
+  camera.up.copy(cowUp);
+  camera.lookAt(cowHead);
+  camera.updateMatrixWorld(true);
+  canvas.pointerdown(touch(42, innerWidth / 2, innerHeight / 2));
+  canvas.pointerup(touch(42, innerWidth / 2, innerHeight / 2));
+  assert.ok(cow.reaction > s().time);
+  const sheep = expansion.animals.find((a) => a.kind === 'sheep');
+  game.greetAnimal(sheep);
+  assert.ok(sheep.reaction > s().time);
+});
+
+check('simultaneous touches, jump on press and camera drag threshold', () => {
+  game.resetHome();
+  // Independent touches, immediate jump, camera dead zone and drag history.
+  hud('jump').pointerdown(touch(3, 750, 330));
+  assert.equal(s().jumpVelocity, 8.3);
+  game.resetHome();
+  canvas.pointerdown(touch(10, 140, 300));
+  canvas.pointermove(touch(10, 140, 260));
+  assert.ok(s().joy.y < -0.8);
+  const oldPitch = s().pitch;
+  canvas.pointerdown(touch(11, 550, 220));
+  canvas.pointermove(touch(11, 552, 222));
+  assert.equal(s().pitch, oldPitch);
+  canvas.pointermove(touch(11, 550, 180));
+  assert.ok(s().pitch > oldPitch);
+  assert.ok(s().joy.y < -0.8);
+  assert.ok(s().lookMoved);
+  canvas.pointermove(touch(11, 550, 220));
+  assert.ok(s().lookMoved, 'Returning a drag to start is still a drag');
+  canvas.pointerup(touch(11, 550, 220));
+  canvas.pointerup(touch(10, 140, 260));
+  assert.equal(s().joy.y, 0);
+  assert.equal(s().lookId, null);
+});
+
+check('accelerate and cross lake shore to shore', () => {
+  // Accelerating toward the lake, crossing both shores, hovering and remounting in deep water.
+  game.resetHome();
+  const n = normalAt(-29, 28);
+  ride(n, 0, { position: surface(n) });
+  parts.drive.reset();
+  game.press('w');
+  let wet = 0;
+  for (let i = 0; i < 200; i++) {
+    game.step(0.016);
+    if (lakeRadius(s().normal) < 0.7) {
+      wet++;
+      assert.ok(
+        Math.abs(parts.expansion.bike.position.distanceTo(CENTER) - (RADIUS - 1.24)) < 0.06,
+        'Speeder remains above water',
+      );
+      assert.ok(!s().swimming);
+    }
+  }
+  game.releaseKeys();
+  assert.ok(wet > 40, 'Cross lake interior');
+  assert.ok(chart(s().normal).z < -47, 'Reach opposite shore');
+  assert.ok(lakeRadius(s().normal) > 1);
+});
+
+check('dismount into lake, remount and water wake', () => {
+  const n = normalAt(-29, -15);
+  game.place({ normal: n, heading: s().heading.clone().projectOnPlane(n).normalize() });
+  game.step(0.016);
+  assert.ok(parts.lakeWater.uniforms.wake.value > 0);
+  game.bikeAction();
+  game.step(0.016);
+  assert.ok(s().swimming);
+  assert.equal(game.getContext().type, 'bike');
+  game.bikeAction();
+  assert.ok(s().riding);
+  assert.ok(!s().swimming);
+});
+
+check('hold brake stops speeder', () => {
+  hud('brake').pointerdown(touch(12, 750, 330));
+  steps(40);
+  assert.equal(s().speed, 0);
+  hud('brake').pointerup(touch(12, 750, 330));
+  assert.ok(!s().brakeHeld);
+});
+
+check('steering, free look and delayed camera recenter', () => {
+  // Manual camera orientation does not determine the vehicle course.
+  game.resetHome();
+  ride(normalAt(73, 32), 20, { lastLookTime: s().time });
+  game.turnView(0.5);
+  const lookAngle = s().forward.angleTo(s().heading);
+  game.press('w');
+  game.step(0.016);
+  assert.ok(Math.abs(s().forward.angleTo(s().heading) - lookAngle) < 0.001);
+  game.place({ lastLookTime: -100 });
+  game.step(0.016);
+  assert.ok(s().forward.angleTo(s().heading) < lookAngle);
+  game.press('d');
+  const before = s().heading.clone();
+  game.step(0.1);
+  assert.ok(before.angleTo(s().heading) > 0.05);
+  game.releaseKeys();
+});
+
+check('speeder collision at full speed', () => {
+  // High speed movement cannot pass through a tree trunk.
+  const trunk = parts.collisions.objects.find((c) => c.height > 4 && c.radius < 3);
+  const tangent = new T.Vector3(1, 0, 0).projectOnPlane(trunk.n).normalize();
+  const n = trunk.n
+    .clone()
+    .addScaledVector(tangent, (trunk.radius + 6) / RADIUS)
+    .normalize();
+  const f = trunk.n.clone().addScaledVector(n, -trunk.n.dot(n)).normalize();
+  game.place({ normal: n, forward: f, heading: f, speed: 48, position: surface(n) });
+  game.press('w');
+  for (let i = 0; i < 12; i++) {
+    game.step(0.045);
+    assert.ok(s().normal.distanceTo(trunk.n) * RADIUS > trunk.radius + 1.25);
+  }
+  game.releaseKeys();
+});
+
+check('sun interior halo and spherical cage visibility', () => {
+  const { camera, innerSun, sunCage, sunInteriorUniforms, updateSunEffects } = parts;
+  camera.position.copy(CENTER).add(new T.Vector3(0, -8, 0));
+  updateSunEffects(1);
+  assert.ok(innerSun.visible && sunCage.visible && sunInteriorUniforms.strength.value > 0.99);
+  camera.position.set(0, 4, 0);
+  updateSunEffects(1);
+  assert.ok(!innerSun.visible && !sunCage.visible);
+});
+
+check('accelerator hold, multiple fingers, brake priority and pointer cancellation', () => {
+  game.resetHome();
+  const n = normalAt(73, 32);
+  ride(n, 0, { position: surface(n) });
+  hud('accelerate').pointerdown(touch(30, 750, 250));
+  assert.ok(s().accelerateHeld);
+  steps(40);
+  assert.ok(s().speed > 18 && s().speed < 21);
+  assert.ok(!hud('accelerate').hidden && !hud('brake').hidden && hud('jump').hidden);
+  hud('accelerate').pointerdown(touch(31, 750, 250));
+  hud('accelerate').pointerup(touch(30, 750, 250));
+  assert.ok(s().accelerateHeld, 'Second finger still holds pedal');
+  hud('brake').pointerdown(touch(32, 750, 330));
+  steps(30);
+  assert.equal(s().speed, 0, 'Brake wins over accelerator');
+  hud('brake').pointercancel(touch(32, 750, 330));
+  game.step(0.016);
+  assert.ok(s().speed > 0);
+  hud('accelerate').lostpointercapture(touch(31, 750, 250));
+  assert.ok(!s().accelerateHeld);
+  steps(30);
+  assert.equal(s().speed, 0);
+});
+
+check('tilt driving, automatic camera, recenter and rotate phone', () => {
+  const { tilt } = parts;
+  tilt.state = 'waiting';
+  tilt.read({ beta: 55, gamma: 0 });
+  tilt.read({ beta: 55, gamma: 0 });
+  game.updateHud();
+  assert.ok(tilt.enabled && hud('stick').hidden && !hud('recenter').hidden);
+  tilt.read({ beta: 55, gamma: 30 });
+  hud('accelerate').pointerdown(touch(34, 750, 250));
+  const headingStart = s().heading.clone();
+  steps(35);
+  assert.ok(s().speed > 15, 'Accelerator works in tilt mode');
+  assert.ok(headingStart.angleTo(s().heading) > 0.2, 'Sensor changes course');
+  assert.ok(s().forward.angleTo(s().heading) < 0.6, 'Camera follows turn');
+  canvas.pointerdown(touch(35, 550, 200));
+  canvas.pointerup(touch(35, 550, 200));
+  assert.equal(s().lookId, null, 'Camera pointer released in tilt mode');
+  hud('recenter').click();
+  assert.ok(!s().accelerateHeld);
+  tilt.read({ beta: 55, gamma: 30 });
+  assert.equal(tilt.update(0.016), 0, 'Recenter while holding a comfortable pose');
+  hud('accelerate').pointerdown(touch(36, 750, 250));
+  game.orientationChanged();
+  assert.ok(!s().accelerateHeld);
+  assert.equal(s().speed, 0, 'Screen rotation releases throttle');
+  tilt.stop();
+  game.updateHud();
+  assert.ok(!hud('stick').hidden);
+});
+
+check('dismount clears pedals and restores walking controls', () => {
+  hud('accelerate').pointerdown(touch(37, 750, 250));
+  game.bikeAction();
+  assert.ok(!s().riding && !s().accelerateHeld);
+  game.step(0.016);
+  assert.ok(hud('accelerate').hidden && hud('brake').hidden && !hud('jump').hidden);
+});
+
+check('cow and sheep mount, gallop, tilt, jump, land and remain after dismount', () => {
+  // Both kinds are actual moving mounts, including when their grazing update runs.
+  const { expansion, tilt, animalGround } = parts;
+  for (const kind of ['cow', 'sheep']) {
+    game.resetHome();
+    const a = expansion.animals.find((a) => a.kind === kind);
+    a.n = normalAt(73, 32);
+    a.root.position.copy(surface(a.n));
+    a.root.quaternion.copy(orientation(a.n));
+    game.place({ normal: a.n, position: surface(a.n) });
+    game.contextAction();
+    assert.equal(s().mountedAnimal, a);
+    assert.ok(a.ridden && s().riding);
+    game.updateHud();
+    assert.ok(!hud('jump').hidden);
+    const initial = a.n.clone();
+    game.press('w');
+    game.jump();
+    let highest = 0;
+    for (let i = 0; i < 160; i++) {
+      game.step(0.016);
+      expansion.updateAnimals(i * 0.016, 0.016, s().position);
+      highest = Math.max(highest, s().jumpHeight);
+      assert.ok(a.n.distanceTo(s().normal) < 1e-10);
+      assert.ok(
+        a.root.position.distanceTo(surface(s().normal, animalGround(s().normal) + s().jumpHeight)) <
+          1e-8,
+      );
+    }
+    game.releaseKeys();
+    assert.ok(highest > 2.7 && s().jumpHeight === 0);
+    assert.ok(initial.distanceTo(s().normal) * RADIUS > 15);
+    tilt.state = 'waiting';
+    tilt.read({ beta: 55, gamma: 0 });
+    tilt.read({ beta: 55, gamma: 0 });
+    tilt.read({ beta: 55, gamma: 25 });
+    hud('accelerate').pointerdown(touch(65, 750, 250));
+    const oldHeading = s().heading.clone();
+    steps(20);
+    assert.ok(oldHeading.angleTo(s().heading) > 0.05);
+    tilt.stop();
+    const parked = a.n.clone();
+    game.bikeAction();
+    assert.ok(!s().riding && !s().mountedAnimal && !a.ridden);
+    expansion.updateAnimals(80, 0.016, s().position);
+    assert.ok(a.n.distanceTo(parked) < 1e-9, 'Released animal stays where ridden');
+  }
+});
+
+check('walk across the elevated bridge without swimming', () => {
+  // New lake water, exposed island, and dry bridge use the same terrain functions.
+  game.resetHome();
+  const bridge = parts.landscape.bridgeSamples.find((n) => bigLakeRadius(n) < 0.6);
+  assert.ok(bridge);
+  game.place({
+    normal: bridge,
+    position: surface(bridge, roadOffset(bridge)),
+    forward: new T.Vector3().crossVectors(ROAD_AXIS, bridge).normalize(),
+  });
+  game.press('w');
+  for (let i = 0; i < 70; i++) {
+    game.step(0.016);
+    assert.ok(!s().swimming);
+    assert.ok(s().position.distanceTo(CENTER) < RADIUS - 2);
+  }
+  game.releaseKeys();
+});
+
+check('raised island with six collidable trees', () => {
+  game.place({ normal: parts.landscape.island });
+  game.clearInput();
+  game.step(0.016);
+  assert.ok(!s().swimming);
+  assert.ok(s().position.distanceTo(CENTER) < RADIUS - 1);
+  assert.ok(islandDistance(s().normal) < 1);
+  assert.ok(parts.collisions.objects.filter((c) => islandDistance(c.n) < 17).length >= 6);
+});
+
+check('swim and use speeder on the large lake', () => {
+  const { landscape, expansion, hoverBase } = parts;
+  game.place({ normal: landscape.island.clone().addScaledVector(ROAD_AXIS, -0.13).normalize() });
+  game.clearInput();
+  game.step(0.016);
+  assert.ok(bigLakeRadius(s().normal) < 1 && s().swimming, 'Swim in new lake');
+  const n = s().normal;
+  expansion.bike.position.copy(surface(n, 1 + hoverBase(n)));
+  game.place({ position: surface(n, lakeDepth(n) - 1) });
+  game.bikeAction();
+  game.step(0.016);
+  assert.ok(s().riding && !s().swimming);
+  assert.ok(Math.abs(expansion.bike.position.distanceTo(CENTER) - (RADIUS - 1.24)) < 0.1);
+  game.bikeAction();
+  game.step(0.016);
+  assert.ok(s().swimming);
+});
+
+check(
+  'moving hemispherical cover, opposite day/night, water lighting and full three-minute cycle',
+  () => {
+    const { dayNight, scene, distantWater } = parts;
+    const homeN = normalAt(29, -4),
+      homePosition = surface(homeN);
+    dayNight.update(0, homePosition);
+    assert.ok(daylightAt(homeN, dayNight.direction.value) > 0.99);
+    const lit = scene.fog.color.clone();
+    dayNight.update(90, homePosition);
+    assert.ok(daylightAt(homeN, dayNight.direction.value) < 0.01);
+    assert.ok(daylightAt(homeN.clone().negate(), dayNight.direction.value) > 0.99);
+    assert.ok(scene.fog.color.r < lit.r * 0.2);
+    const capDirection = new T.Vector3(0, 1, 0).applyQuaternion(dayNight.cap.quaternion);
+    assert.ok(capDirection.distanceTo(dayNight.direction.value) < 1e-9);
+    assert.ok(distantWater.uniforms.shadeDirection.value.distanceTo(capDirection) < 1e-9);
+    dayNight.update(180, homePosition);
+    assert.ok(daylightAt(homeN, dayNight.direction.value) > 0.99);
+    for (const material of dayNight.patched) {
+      const shader = {
+        uniforms: {},
+        vertexShader: T.ShaderLib.standard.vertexShader,
+        fragmentShader: T.ShaderLib.standard.fragmentShader,
+      };
+      material.onBeforeCompile(shader);
+      assert.ok(shader.vertexShader.includes('solarWorldPosition=(modelMatrix*solarPosition).xyz'));
+      assert.ok(shader.fragmentShader.includes('reflectedLight.directDiffuse*=1.-shade*.975'));
+      assert.equal(shader.uniforms.shadeDirection, dayNight.direction);
+    }
+  },
+);
+
+check('three tree silhouettes, clear flower fields and composed wind/night shaders', () => {
+  const { forest, fields, collisions, dayNight } = parts;
+  assert.ok(
+    forest.groups.every((g) => g.length > 0),
+    'All three tree silhouettes',
+  );
+  assert.equal(fields.locations.length, 2100);
+  for (const n of fields.locations) {
+    assert.ok(roadDistance(n) >= 7);
+    assert.ok(lakeRadius(n) >= 1.08);
+    assert.ok(
+      collisions.nearby(n).every((c) => c.n.distanceTo(n) * RADIUS > c.radius),
+      'Flower clearings remain open',
+    );
+  }
+  for (const material of dayNight.patched) {
+    if (!material.userData.wind) continue;
+    const shader = {
+      uniforms: {},
+      vertexShader: T.ShaderLib.standard.vertexShader,
+      fragmentShader: T.ShaderLib.standard.fragmentShader,
+    };
+    material.onBeforeCompile(shader);
+    assert.ok(shader.vertexShader.includes('uniform float windTime'));
+    assert.ok(shader.vertexShader.includes('solarWorldPosition=(modelMatrix*solarPosition).xyz'));
+    assert.ok(shader.uniforms.windTime);
+  }
+});
+
+check('local daytime butterflies and night light uniforms', () => {
+  const { expansion, fields, nightDetails } = parts;
+  const meadow = expansion.meadowNormal(0, 0);
+  fields.update(1, surface(meadow), meadow.clone().negate());
+  assert.ok(fields.wings.visible);
+  for (const batch of [fields.wings, fields.bodies])
+    assert.ok(batch.instanceMatrix.array.every(Number.isFinite));
+  fields.update(2, surface(meadow), meadow);
+  assert.ok(!fields.wings.visible, 'Butterflies rest at night');
+  nightDetails.update(1, surface(meadow), meadow);
+  assert.ok(nightDetails.flies.uniforms.shadeDirection.value.distanceTo(meadow) < 1e-9);
+  assert.equal(nightDetails.fireflies.length, 150);
+  assert.ok(nightDetails.lampPositions.length > 6);
+});
+
+// The trail effects are driven with a synthetic player state, independent of the game.
+const effectState = {
+  normal: normalAt(0, 25),
+  position: surfacePoint(0, 25),
+  forward: new T.Vector3(0, 0, -1),
+  riding: true,
+  animal: { kind: 'cow' },
+  jumpHeight: 0,
+  climb: null,
+  mode: 'walk',
+};
+let effectTime = 0;
+const effectStep = (dt) => {
+  effectTime += dt;
+  return parts.trailEffects.update(
+    effectTime,
+    dt,
+    effectState,
+    parts.dayNight.direction.value,
+    parts.lakeWater.uniforms.mist.value,
+  );
+};
+
+check('hoof dust, landing clouds, speeder grass and water-entry splashes', () => {
+  const { trailEffects, expansion } = parts;
+  const state = effectState;
+  trailEffects.reset();
+  effectStep(0.016);
+  const dustBefore = trailEffects.stats.dust;
+  for (let i = 0; i < 15; i++) {
+    state.normal = advanceFrame(state.normal, state.forward, 0, 1, 0.2).normal;
+    state.position = surface(state.normal);
+    effectStep(0.016);
+  }
+  assert.ok(trailEffects.stats.dust > dustBefore, 'Hoof dust');
+  state.jumpHeight = 2;
+  effectStep(0.016);
+  const landBefore = trailEffects.stats.landings;
+  state.jumpHeight = 0;
+  effectStep(0.016);
+  assert.equal(trailEffects.stats.landings, landBefore + 1);
+  const meadow = expansion.meadowNormal(0, 0);
+  state.normal = meadow.clone();
+  state.position = surface(state.normal);
+  state.animal = null;
+  trailEffects.reset();
+  effectStep(0.016);
+  const grassBefore = trailEffects.stats.grass;
+  for (let i = 0; i < 15; i++) {
+    state.normal = advanceFrame(
+      state.normal,
+      state.forward.clone().projectOnPlane(state.normal).normalize(),
+      0,
+      1,
+      0.2,
+    ).normal;
+    state.position = surface(state.normal);
+    effectStep(0.016);
+  }
+  assert.ok(trailEffects.stats.grass > grassBefore, 'Speeder stirs grass');
+  state.riding = false;
+  state.normal = normalAt(-29, 20);
+  state.position = surface(state.normal);
+  trailEffects.reset();
+  effectStep(0.016);
+  const entryBefore = trailEffects.stats.waterEntries;
+  state.normal = normalAt(-29, 10);
+  state.position = surface(state.normal);
+  effectStep(0.016);
+  assert.equal(trailEffects.stats.waterEntries, entryBefore + 1);
+  assert.ok(trailEffects.stats.splash >= 22);
+});
+
+check('nearby falling leaves and bounded particle pool expires cleanly', () => {
+  const { trailEffects, forest } = parts;
+  const state = effectState;
+  const goldTree = forest.groups[2][0];
+  state.normal = goldTree.n.clone();
+  state.position = surface(state.normal);
+  trailEffects.reset();
+  const leavesBefore = trailEffects.stats.leaves;
+  for (let i = 0; i < 15; i++) effectStep(0.05);
+  assert.ok(trailEffects.stats.leaves > leavesBefore, 'Leaves fall near leafy trees');
+  trailEffects.emit(state.normal, state.position, 0, 700);
+  state.climb = {};
+  let alive = 0;
+  for (let i = 0; i < 170; i++) {
+    alive = effectStep(0.05);
+    assert.ok(alive <= 320);
+    for (const attr of Object.values(trailEffects.points.geometry.attributes))
+      assert.ok(attr.array.every(Number.isFinite));
+  }
+  assert.equal(alive, 0);
+  assert.equal(trailEffects.particles.length, 320);
+});
+
+for (const { name, run } of checks) {
+  try {
+    run();
+    results.push(name);
+  } catch (e) {
+    console.log(results);
+    console.error(`Échec : ${name}\n${e.message}`);
+    process.exitCode = 1;
+    break;
+  }
+}
+if (!process.exitCode) console.log(results);

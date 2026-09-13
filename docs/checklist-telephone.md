@@ -1,0 +1,16 @@
+# Checklist téléphone
+
+À dérouler aux jalons prévus par le plan de restructuration, ou après tout changement des commandes, de la physique, des shaders ou des performances. Noter le téléphone, le navigateur et la date.
+
+- [ ] Entrée dans le monde, son actif après le premier appui
+- [ ] Marche, caméra et saut, en portrait puis en paysage
+- [ ] Collision avec un arbre et un rocher
+- [ ] Nage et sortie du petit lac et du grand lac
+- [ ] Speeder au joystick : accélération, roue libre, freinage, demi-tour
+- [ ] Speeder à l'inclinaison, avec recentrage
+- [ ] Speeder au-dessus des deux lacs
+- [ ] Vache et mouton : réaction au toucher, montée, saut, descente
+- [ ] Pont et île
+- [ ] Ascenseur jusqu'à la salle du soleil et retour
+- [ ] Cycle jour/nuit visible
+- [ ] Retour dans le jeu après mise en veille
