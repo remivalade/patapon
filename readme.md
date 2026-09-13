@@ -137,7 +137,7 @@ La suite de régression emploie les véritables mathématiques Three.js avec un 
 
 **Ces tests ne compilent pas les shaders sur un GPU et ne mesurent pas la fluidité réelle.** Avant une version destinée à Marceau, essayer sur le téléphone : entrée dans le monde, marche et caméra, collisions, nage, speeder avec inclinaison, saut à dos d'animal, pont, ascenseur et transition jour/nuit. Tester portrait et paysage, puis le retour dans le jeu après mise en veille. Vérifier aussi l'audio après le premier appui.
 
-Le jeu n'a actuellement ni sauvegarde persistante, ni mode hors ligne installé, ni multijoueur. Certaines parties de `world.js` restent très compactes : la mise en dossier ne constitue pas encore une refonte de l'architecture.
+Le jeu n'a actuellement ni sauvegarde persistante, ni mode hors ligne installé, ni multijoueur. Le code est formaté et découpé par responsabilité (voir le plan dans `docs/`) ; `world.js` garde l'état du joueur, les commandes, la caméra et la boucle de jeu.
 
 ## Faire évoluer le jeu
 
