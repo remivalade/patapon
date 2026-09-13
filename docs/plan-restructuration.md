@@ -25,6 +25,13 @@ Ensuite, retour aux nouveautés pour Marceau.
 | 3. Découpage limité        | Extraire les responsabilités évidentes de `world.js` en conservant les calculs, les constantes et l'ordre des mises à jour. Quatre ou cinq fichiers supplémentaires sont une bonne cible, pas une obligation. |
 | 4. Mode joueur explicite   | Centraliser marche, nage, monture et ascenseur, ainsi que leurs transitions. Conserver séparément la phase de l'expérience : introduction, arrivée, jeu.                                                      |
 
+## Avancement
+
+- Étape 1 terminée : version de référence `9873a01`, formatage Prettier vérifié par captures d'écran identiques, checklist ajoutée.
+- Étape 2 terminée : `world.js` expose `createGame({ renderer })`, `main.js` démarre le jeu dans le navigateur, `tests/harness.mjs` crée une partie simulée. Les 26 vérifications passent par cette porte d'entrée, sans lire le texte de `world.js`.
+- Étape 3 : à faire.
+- Étape 4 : à faire.
+
 ## Précisions
 
 - **Formatage.** Le risque est très faible plutôt que nul. Un outil automatique (Prettier, configuration dans `.prettierrc.json`), un diff exclusivement de formatage et les tests existants suffisent à le vérifier.

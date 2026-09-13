@@ -10,6 +10,7 @@
 - Demander l'accès aux capteurs uniquement après un appui. Préserver le joystick en cas de refus ou de capteurs absents. Vérifier portrait et les deux paysages.
 - Three.js r169 est inclus avec sa licence. Les matériaux modifient `onBeforeCompile` et composent les effets de vent et de nuit ; ne pas écraser ces hooks en ajoutant un effet.
 - Réutiliser l'instanciation et les pools de particules ; éviter de multiplier les lumières dynamiques et les allocations dans la boucle de rendu. Mesurer sur téléphone avant d'affirmer un gain de fluidité.
+- Les tests ne lisent pas l'intérieur de `world.js` : ils passent par l'objet rendu par `createGame` (commandes, `place`, `state`, `parts`) et par le harnais `tests/harness.mjs`. Quand une fonction change de fichier, garder cet objet à jour plutôt que d'exposer des variables internes.
 - Les tests simulent le DOM et WebGL, pas les mathématiques Three.js. Ils ne prouvent ni le rendu GPU, ni les performances, ni les permissions réelles des capteurs. Donner les limites de validation dans les comptes rendus.
 - Garder les changements petits et expliquer pourquoi ils sont nécessaires. Le refactoring de `world.js` reste à faire progressivement ; ne pas mêler une grosse refonte et des nouveautés de jeu.
 - Ne pas ajouter de secrets, de compte serveur ou de service externe sans besoin établi. L'hébergement cible de cet export est Vercel statique.
