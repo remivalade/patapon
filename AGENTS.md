@@ -4,6 +4,7 @@
 - Lire `readme.md`. Les sources sont dans `src/`, le point d'entrée à la racine. `dist/` est généré et ignoré par Git.
 - Commandes : `npm run dev`, `npm run check`, `npm test`, `npm run build`, `npm run preview`. Node.js 22+, aucune installation de dépendances dans cette version.
 - Le monde est la face INTÉRIEURE d'une sphère de rayon 260 centrée en (0, 260, 0). La normale pointe vers l'extérieur ; le haut local pointe vers le centre. Une hauteur positive rapproche du centre.
+- Le monde est construit dans un ordre fixe (`exterior.js`, puis `habitat.js` qui appelle `village.js` et `sun.js`, puis `marceau.js`) avec une seule suite aléatoire partagée. Déplacer un appel de construction change les positions des arbres, rochers et fleurs.
 - Utiliser les fonctions de `navigation.js` pour placer et déplacer les objets. Le transport parallèle permet de traverser les pôles ; ne pas remplacer cette navigation par un plan X/Z global. Le grand lac utilise sa propre carte locale près de l'antipode.
 - Garder cohérents le rendu du pont, le relief, les hauteurs de marche et les collisions. Le speeder doit continuer à franchir les lacs.
 - Préserver les états de marche/nage/conduite/ascenseur et le nettoyage des entrées lors d'une perte de focus, d'un changement d'orientation et d'une descente de monture. Freiner est prioritaire sur accélérer.
