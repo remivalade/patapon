@@ -151,6 +151,36 @@ svg {
   opacity: 0.8;
   transition: opacity 2s;
 }
+/* Speed streaks converging on the centre while an animal bolts; the game sets the opacity. */
+#speed {
+  position: fixed;
+  inset: -12%;
+  pointer-events: none;
+  opacity: 0;
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg 9deg,
+    #fff9 9deg 9.6deg,
+    transparent 9.6deg 17deg
+  );
+  -webkit-mask: radial-gradient(ellipse at center, transparent 34%, #000 78%);
+  mask: radial-gradient(ellipse at center, transparent 34%, #000 78%);
+  animation: rush 0.14s steps(2) infinite alternate;
+  transition: opacity 0.25s;
+}
+@keyframes rush {
+  from {
+    transform: rotate(-2.5deg);
+  }
+  to {
+    transform: rotate(2.5deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #speed {
+    animation: none;
+  }
+}
 #fade {
   position: fixed;
   inset: 0;

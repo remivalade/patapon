@@ -108,13 +108,16 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
   world.add(stems, blooms);
   const animals = [];
   function animal(kind, x, z, index) {
+    // root stands on the ground and turns; figure carries the model and can bounce or rock.
     const root = new T.Group(),
+      figure = new T.Group(),
       cow = kind === 'cow',
       legs = [],
       head = new T.Group();
     root.userData.kind = kind;
+    root.add(figure);
     world.add(root);
-    const body = ball(root, 0, cow ? 1.6 : 1.1, 0, 1, cow ? '#f6f0db' : '#ece6d0', 1);
+    const body = ball(figure, 0, cow ? 1.6 : 1.1, 0, 1, cow ? '#f6f0db' : '#ece6d0', 1);
     body.scale.set(cow ? 1 : 0.7, cow ? 0.82 : 0.68, cow ? 1.7 : 1.08);
     if (cow) {
       for (const [x, y, z, s] of [
@@ -122,14 +125,14 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
         [-0.83, 1.7, -0.65, 0.5],
         [0.1, 2.35, -0.45, 0.5],
       ]) {
-        const p = ball(root, x, y, z, s, '#4b5047', 0);
+        const p = ball(figure, x, y, z, s, '#4b5047', 0);
         p.scale.set(0.8, 0.7, 1.2);
       }
     } else {
       for (let i = 0; i < 11; i++) {
         const a = (i / 11) * Math.PI * 2;
         ball(
-          root,
+          figure,
           Math.cos(a) * 0.57,
           1.2 + Math.sin(a) * 0.45,
           (rand() - 0.5) * 1.45,
@@ -140,7 +143,7 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
       }
     }
     head.position.set(0, cow ? 1.85 : 1.25, cow ? 1.55 : 1.05);
-    root.add(head);
+    figure.add(head);
     const skull = ball(head, 0, 0, 0, cow ? 0.59 : 0.38, cow ? '#f1ead9' : '#68614f', 1);
     skull.scale.z = 1.25;
     const muzzle = ball(
@@ -183,12 +186,12 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
           5,
         );
         box(leg, 0, cow ? -0.94 : -0.76, 0.05, cow ? 0.32 : 0.24, 0.2, 0.35, '#454b40');
-        root.add(leg);
+        figure.add(leg);
         legs.push(leg);
       }
     }
     beam(
-      root,
+      figure,
       [0, cow ? 1.9 : 1.4, cow ? -1.7 : -1],
       [0, cow ? 0.9 : 0.9, cow ? -1.95 : -1.3],
       cow ? 0.06 : 0.1,
@@ -196,6 +199,7 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
     );
     const a = {
       root,
+      figure,
       head,
       legs,
       kind,
@@ -245,8 +249,15 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
         a.head.rotation.y = T.MathUtils.clamp(Math.atan2(look.x, look.z), -0.7, 0.7);
         a.head.rotation.x = -0.05;
       }
+      // Breathing while grazing, a light bob and a fuller stride while wandering.
+      a.figure.scale.y = 1 + 0.012 * Math.sin(t * 1.4 + a.index);
+      a.figure.position.y = grazing ? 0 : Math.abs(Math.sin(t * 3)) * 0.035;
+      a.figure.rotation.set(grazing ? 0 : Math.sin(t * 3 + 0.6) * 0.02, 0, 0);
       a.legs.forEach(
-        (leg, i) => (leg.rotation.x = grazing ? 0 : Math.sin(t * 3 + (i % 2) * Math.PI) * 0.18),
+        (leg, i) =>
+          (leg.rotation.x = grazing
+            ? 0
+            : Math.sin(t * 3 + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.26),
       );
     }
   }

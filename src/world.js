@@ -1,6 +1,6 @@
 import * as T from './vendor/three.module.min.js';
 import { createAmbience } from './audio.js';
-import { SpeederHandling, WalkHandling, radialInput } from './handling.js';
+import { SpeederHandling, WalkHandling, radialInput, MOUNTS } from './handling.js';
 import { TiltSteering } from './tilt.js';
 import { buildDayNight } from './landscape.js';
 import { buildFields, addWind, windTime } from './vegetation.js';
@@ -158,6 +158,25 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     swimming = next.type === 'swimming';
     mountedAnimal = riding ? next.animal : null;
     climb = next.type === 'lift' ? next.climb : null;
+    if (!riding) setRush(0);
+  }
+  // The handling numbers of whatever the player is riding.
+  function mountProfile() {
+    return mountedAnimal ? MOUNTS[mountedAnimal.kind] : MOUNTS.speeder;
+  }
+  function rideRatio() {
+    return Math.abs(drive.speed) / mountProfile().maxSpeed;
+  }
+  // rush: how hard a mounted animal is bolting (0 to 1); drives the streaks, the wider
+  // view and the dust. mountBob: the gallop bounce shared by the animal and its rider.
+  let rush = 0,
+    mountBob = 0,
+    shownRush = -1;
+  function setRush(value) {
+    const shown = Math.round(value * 20) / 20;
+    if (shown === shownRush) return;
+    shownRush = shown;
+    $('speed').style.opacity = String(shown);
   }
   player.position.copy(surface(navNormal));
   player.visible = false;
@@ -325,6 +344,13 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     forward.set(0, 0, 1).applyQuaternion(a.root.quaternion).projectOnPlane(navNormal).normalize();
     setMode({ type: 'riding', animal: a });
     bikeHeading.copy(forward);
+    // The animal bolts at once: a burst of speed and a warning for the rider.
+    drive.speed = MOUNTS[a.kind].maxSpeed * 0.35;
+    driveNotice(
+      a.kind === 'cow'
+        ? 'Meuh ! La vache n’est pas contente. Accroche-toi, freine pour la calmer !'
+        : 'Bêêê ! Le mouton s’emballe. Accroche-toi, freine pour le calmer !',
+    );
     greetAnimal(a);
   }
   function animalGround(n) {
@@ -389,7 +415,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     if (c) $('action-label').textContent = c.text;
     $('hud').classList.toggle('riding', riding);
     $('hud').classList.toggle('animal-mounted', !!mountedAnimal);
-    $('accelerate').hidden = $('brake').hidden = $('tilt').hidden = !riding;
+    $('accelerate').hidden = !riding || !!mountedAnimal;
+    $('brake').hidden = $('tilt').hidden = !riding;
     $('recenter').hidden = !riding || !tilt.enabled;
     $('stick').hidden = riding && tilt.enabled;
     $('lookhint').hidden = riding && tilt.enabled;
@@ -683,7 +710,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       .normalize();
     const offset = Math.max(
       1.1,
-      (riding ? 10 + (Math.abs(drive.speed) / 48) * 3 : 9) * (1 - Math.max(0, pitch) / 1.65),
+      (riding ? 10 + rideRatio() * 3 : 9) * (1 - Math.max(0, pitch) / 1.65),
     );
     desired
       .copy(eye)
@@ -701,7 +728,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     camera.lookAt(viewTarget);
     camera.fov = T.MathUtils.lerp(
       camera.fov,
-      riding ? 59 + (Math.abs(drive.speed) / 48) * 6 : 59,
+      riding ? 59 + rideRatio() * (mountedAnimal ? 14 : 6) : 59,
       Math.min(1, dt * 3),
     );
     camera.updateProjectionMatrix();
@@ -792,15 +819,20 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
         (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
     const length = Math.hypot(side, ahead);
     moving = Math.min(1, length);
+    const profile = mountProfile();
+    rush = mountBob = 0;
     if (riding) {
       const byTilt = tilt.enabled;
       side = byTilt ? tilt.update(dt) : T.MathUtils.clamp(side, -1, 1);
-      ahead = accelerateHeld
+      // A charging animal runs on its own; the accelerator only matters on the speeder.
+      ahead = profile.charge
         ? 1
-        : byTilt
-          ? (keys.has('w') || keys.has('z') || keys.has('arrowup') ? 1 : 0) -
-            (keys.has('s') || keys.has('arrowdown') ? 1 : 0)
-          : T.MathUtils.clamp(ahead, -1, 1);
+        : accelerateHeld
+          ? 1
+          : byTilt
+            ? (keys.has('w') || keys.has('z') || keys.has('arrowup') ? 1 : 0) -
+              (keys.has('s') || keys.has('arrowdown') ? 1 : 0)
+            : T.MathUtils.clamp(ahead, -1, 1);
     } else {
       side /= Math.max(1, length);
       ahead /= Math.max(1, length);
@@ -858,14 +890,11 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     }
     if (!climb) {
       if (riding) {
-        const handling = drive.update(
-            ahead,
-            side,
-            brakeHeld || (keys.has(' ') && !mountedAnimal),
-            dt,
-          ),
-          speedFactor = mountedAnimal ? (mountedAnimal.kind === 'cow' ? 0.375 : 0.46) : 1;
-        handling.speed *= speedFactor;
+        const braking =
+          brakeHeld ||
+          (keys.has(' ') && !mountedAnimal) ||
+          (profile.charge && (keys.has('s') || keys.has('arrowdown')));
+        const handling = drive.update(ahead, side, braking, dt, profile);
         bikeHeading.projectOnPlane(navNormal).normalize().applyAxisAngle(activeUp(), handling.turn);
         const oldNormal = navNormal.clone();
         const right = forward.clone().cross(activeUp()).normalize();
@@ -877,7 +906,11 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
         const actual = oldNormal.distanceTo(navNormal) * RADIUS,
           expected = Math.abs(handling.speed) * dt;
         if (expected > 0.04 && actual < expected * 0.3) drive.speed *= 0.3;
-        moving = Math.abs(drive.speed) / 48;
+        moving = Math.abs(drive.speed) / profile.maxSpeed;
+        if (mountedAnimal) {
+          rush = T.MathUtils.clamp((moving - 0.3) / 0.5, 0, 1);
+          mountBob = Math.max(0, Math.sin(walk)) * 0.24 * moving;
+        }
         if (
           (tilt.enabled || (lookId === null && clock.elapsedTime - lastLookTime > 1.4)) &&
           Math.abs(drive.speed) > 3
@@ -907,7 +940,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
             ? depth + 0.24 - Math.min(1.25, depth * 0.9)
             : 0;
       const ridingHeight = mountedAnimal
-        ? (mountedAnimal.kind === 'cow' ? 1.6 : 0.95) + animalGround(navNormal)
+        ? (mountedAnimal.kind === 'cow' ? 1.6 : 0.95) + animalGround(navNormal) + mountBob
         : 1.05 + (roadOffset(navNormal) > 0 ? roadOffset(navNormal) : hoverBase(navNormal));
       player.position.copy(surface(navNormal, (riding ? ridingHeight : waterHeight) + jumpHeight));
       if (!riding && depth === 0 && jumpHeight < 0.05) {
@@ -935,12 +968,17 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       if (riding)
         q.multiply(
           new T.Quaternion().setFromEuler(
-            new T.Euler(T.MathUtils.clamp(drive.acceleration / 600, -0.06, 0.05), 0, drive.bank),
+            new T.Euler(
+              T.MathUtils.clamp(drive.acceleration / 600, -0.06, 0.05) +
+                (mountedAnimal ? -Math.sin(walk + 0.7) * 0.1 * moving : 0),
+              0,
+              drive.bank,
+            ),
           ),
         );
       if (swimming) q.multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), 0.55));
       player.quaternion.slerp(q, Math.min(1, dt * 14));
-      walk += dt * (swimming ? 5 : 11) * moving;
+      walk += dt * (swimming ? 5 : mountedAnimal ? 15 : 11) * moving;
     } else {
       const oldUp = new T.Vector3(0, 1, 0).applyQuaternion(player.quaternion);
       player.quaternion.premultiply(new T.Quaternion().setFromUnitVectors(oldUp, activeUp()));
@@ -955,15 +993,25 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
             new T.Matrix4().makeBasis(up.clone().cross(bikeHeading).normalize(), up, bikeHeading),
           );
         a.root.quaternion.slerp(q, Math.min(1, dt * 14));
-        a.head.rotation.x = jumpHeight > 0.1 ? -0.22 : Math.sin(walk) * moving * 0.07;
-        a.head.rotation.y = 0;
-        a.legs.forEach(
-          (leg, i) =>
-            (leg.rotation.x =
-              jumpHeight > 0.1
-                ? -0.55
-                : Math.sin(walk + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.6 * moving),
-        );
+        // Gallop: the figure bounces in the flight phase, rocks nose-down on landing and
+        // leans into turns; the head stretches forward; front and rear pairs swing almost
+        // together, the right side leading slightly.
+        a.figure.position.y = mountBob;
+        a.figure.rotation.set(-Math.sin(walk + 0.7) * 0.1 * moving, 0, drive.bank * 0.9);
+        a.figure.scale.y = 1;
+        a.head.rotation.x =
+          jumpHeight > 0.1 ? -0.22 : -0.3 * moving + Math.sin(walk) * 0.1 * moving;
+        a.head.rotation.y = Math.sin(walk * 0.5) * 0.06 * moving;
+        a.legs.forEach((leg, i) => {
+          const front = i === 1 || i === 3,
+            lead = i >= 2 ? 0.35 : 0;
+          leg.rotation.x =
+            jumpHeight > 0.1
+              ? front
+                ? -0.7
+                : 0.4
+              : Math.sin(walk + (front ? 0 : Math.PI * 0.85) + lead) * 0.75 * moving;
+        });
       } else {
         expansion.bike.position.copy(
           surface(
@@ -1009,6 +1057,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     const far = bigLakeChart(navNormal);
     distantWater.uniforms.swimmer.value.set(far.x, far.z);
     distantWater.uniforms.wake.value = lakeWater.uniforms.wake.value;
+    setRush(rush);
     updateCamera(dt);
     updateHud();
   }
@@ -1078,6 +1127,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
         jumpHeight,
         climb,
         mode: phase,
+        rush,
       },
       dayNight.direction.value,
       lakeWater.uniforms.mist.value,
@@ -1135,6 +1185,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       heading: bikeHeading,
       position: player.position,
       speed: drive.speed,
+      rush,
       pitch,
       joy,
       lookId,
