@@ -17,6 +17,7 @@ Le terrain est **la face intérieure d'une sphère** : le sol opposé est visibl
 - Boîtier de commande du soleil au pied de la tour, à côté du bouton d'appel : en vue subjective, un bouton change la couleur du soleil (le bouton prend la couleur actuelle), un bouton règle la vitesse du cache jour/nuit (arrêt, lent, normal, rapide, très rapide, quatre lampes l'indiquent), et un bouton lance le mode disco : le soleil se retrouve dans une coque percée de trous et le monde entier est éclairé par des taches colorées tournantes.
 - Cache solaire mobile produisant un cycle jour/nuit.
 - Variétés d'arbres, champs de fleurs, papillons, lucioles, vent, poussière, éclaboussures et ambiance sonore.
+- Ombres portées réelles autour de Marceau : arbres, rochers, cabane, vaisseau, tour, animaux, speeder et personnages projettent des ombres courtes de midi, qui disparaissent côté nuit et en disco. Un garde-fou les coupe si l'appareil ne tient pas 30 images par seconde.
 
 ## Démarrer sur ordinateur
 
@@ -98,6 +99,7 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 | `src/village.js`              | Pierres de gué, cabane, transat, Patapon et son salut, vaisseau garé                                                                                                                                    |
 | `src/sun.js`                  | Soleil artificiel : sphère, halo, lueur, poussières, intérieur et palette de couleurs                                                                                                                   |
 | `src/sunpanel.js`             | Boîtier de commande du soleil : pupitre, panneau et trois boutons                                                                                                                                       |
+| `src/shadows.js`              | Ombres portées : lumière directionnelle qui suit le joueur, réglages selon l'appareil, garde-fou de fluidité                                                                                            |
 | `src/marceau.js`              | Modèle de Marceau et son ombre au sol                                                                                                                                                                   |
 | `src/navigation.js`           | Géométrie sphérique, déplacements, relief, eau, collisions et pont                                                                                                                                      |
 | `src/handling.js`             | Réponse des déplacements à pied et des montures : un profil de conduite par monture (`MOUNTS`), accélération et freinage                                                                                |
@@ -137,7 +139,7 @@ npm run build
 
 La suite de régression emploie les véritables mathématiques Three.js avec un DOM et un moteur de rendu simulés. Elle vérifie notamment le tour complet de la route, les collisions, les sauts, la nage, le speeder sur l'eau, les montures, l'ascenseur, les entrées tactiles simulées, le pont et la gestion des particules.
 
-**Ces tests ne compilent pas les shaders sur un GPU et ne mesurent pas la fluidité réelle.** Avant une version destinée à Marceau, essayer sur le téléphone : entrée dans le monde, marche et caméra, collisions, nage, speeder avec inclinaison, saut à dos d'animal, pont, ascenseur et transition jour/nuit. Tester portrait et paysage, puis le retour dans le jeu après mise en veille. Vérifier aussi l'audio après le premier appui.
+**Ces tests ne compilent pas les shaders sur un GPU et ne mesurent pas la fluidité réelle.** Les ombres portées se règlent seules : 2048 et filtrage doux sur ordinateur, 1024 et filtrage simple sur téléphone ; si la fluidité mesurée pendant les premières secondes de marche passe sous 30 images par seconde, elles se coupent et le disque sous Marceau revient. Avant une version destinée à Marceau, essayer sur le téléphone : entrée dans le monde, marche et caméra, collisions, nage, speeder avec inclinaison, saut à dos d'animal, pont, ascenseur et transition jour/nuit. Tester portrait et paysage, puis le retour dans le jeu après mise en veille. Vérifier aussi l'audio après le premier appui.
 
 Le jeu n'a actuellement ni sauvegarde persistante, ni mode hors ligne installé, ni multijoueur. Le code est formaté et découpé par responsabilité (voir le plan dans `docs/`) ; `world.js` garde l'état du joueur, les commandes, la caméra et la boucle de jeu.
 

@@ -102,6 +102,7 @@ gl_FragColor=vec4(tint,alpha);}`,
     haloMat.uniforms.tint.value.set(c.halo);
     glowUniforms.tint.value.set(c.glow);
     if (lights?.centralLight) lights.centralLight.color.set(c.light);
+    if (lights?.shadowLight) lights.shadowLight.color.set(c.light);
   }
   function nextColour() {
     setColour(colourIndex + 1);

@@ -291,7 +291,7 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
     depthWrite: false,
     side: T.DoubleSide,
   });
-  mesh(
+  const glassWall = mesh(
     new T.CylinderGeometry(
       7.5,
       7.5,
@@ -308,6 +308,8 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
     TOWER_HEIGHT / 2,
     0,
   );
+  // Glass must not cast a solid shadow over the lift.
+  glassWall.castShadow = false;
   for (const a of [0.4, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.6]) {
     cyl(
       towerGroup,

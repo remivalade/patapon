@@ -10,6 +10,7 @@ import { createRandom, createBuilders } from './builders.js';
 import { buildExterior } from './exterior.js';
 import { buildHabitat } from './habitat.js';
 import { buildMarceau } from './marceau.js';
+import { createShadows } from './shadows.js';
 import {
   RADIUS,
   CENTER,
@@ -51,8 +52,6 @@ export function createGame({ renderer }) {
   renderer.outputColorSpace = T.SRGBColorSpace;
   renderer.toneMapping = T.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = T.PCFSoftShadowMap;
   $('world').appendChild(renderer.domElement);
   const scene = new T.Scene();
   scene.background = new T.Color('#0b1323');
@@ -85,8 +84,12 @@ export function createGame({ renderer }) {
     ship,
     animatePatapon,
     sunPanel,
+    lights,
   } = habitat;
   const { solarMat, halo, innerSun, sunCage, sunInteriorUniforms } = sun;
+  // Real shadows: one directional light following Marceau; its colour follows the sun.
+  const shadows = createShadows({ renderer, world, colour: sun.colour.light });
+  lights.shadowLight = shadows.light;
   function updateSunEffects(t) {
     sun.update(t, dayNight.direction.value, dayNight.disco.value);
   }
@@ -1119,7 +1122,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     });
     robe.position.y = 0.9;
     const up = activeUp();
-    playerShadow.visible = !swimming && !riding;
+    // The flat disc only stands in when real shadows are off.
+    playerShadow.visible = !swimming && !riding && !shadows.enabled;
     playerShadow.position.copy(player.position).addScaledVector(up, 0.03 - jumpHeight);
     playerShadow.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), up);
     const p = chart(navNormal);
@@ -1142,7 +1146,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
   }
   function animate() {
     requestAnimationFrame(animate);
-    const dt = Math.min(clock.getDelta(), 0.045),
+    const real = clock.getDelta(),
+      dt = Math.min(real, 0.045),
       t = clock.elapsedTime;
     if (phase === 'intro') {
       camera.up.set(0, 1, 0);
@@ -1186,12 +1191,20 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       updateCamera(dt);
       if (u >= 7) beginWalk();
     } else move(dt);
-    if (world.visible) updateWorld(t, dt);
+    if (world.visible) updateWorld(t, dt, real);
     renderer.render(scene, camera);
   }
   // Everything that lives in the habitat advances here, after the player has moved.
-  function updateWorld(t, dt) {
-    dayNight.update(t, player.position);
+  function updateWorld(t, dt, realDt = dt) {
+    const daylight = dayNight.update(t, player.position);
+    shadows.update({
+      position: player.position,
+      up: activeUp(),
+      forward,
+      daylight,
+      dt: realDt,
+      active: phase === 'walk',
+    });
     fields.update(t, player.position, dayNight.direction.value);
     nightDetails.update(t, player.position, dayNight.direction.value);
     trailEffects.update(
@@ -1321,6 +1334,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       updateWorld,
       sun,
       sunPanel,
+      shadows,
+      lights,
       panelStand,
       panelFocus,
       player,
