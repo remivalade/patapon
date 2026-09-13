@@ -29,14 +29,15 @@ Ouvrir **http://127.0.0.1:5173**, puis appuyer sur le bouton d'entrée. Arrêter
 
 **Aucun `npm install` n'est nécessaire** dans cet export : Three.js et sa licence sont inclus, les scripts utilisent uniquement Node.js. Aucun compte, serveur applicatif, clé API ou fichier `.env` n'est nécessaire pour jouer.
 
-| Commande                        | Utilité                                                                  |
-| ------------------------------- | ------------------------------------------------------------------------ |
-| `npm run dev`                   | Servir les sources localement ; recharger la page après une modification |
-| `npm run dev -- --host 0.0.0.0` | Autoriser les appareils du même réseau local à accéder au jeu            |
-| `npm run check`                 | Vérifier la syntaxe JavaScript                                           |
-| `npm test`                      | Exécuter les vérifications de logique du jeu                             |
-| `npm run build`                 | Générer le site statique dans `dist/`                                    |
-| `npm run preview`               | Servir `dist/` localement, après le build                                |
+| Commande                        | Utilité                                                                          |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| `npm run dev`                   | Servir les sources localement ; recharger la page après une modification         |
+| `npm run dev -- --host 0.0.0.0` | Autoriser les appareils du même réseau local à accéder au jeu                    |
+| `npm run check`                 | Vérifier la syntaxe JavaScript                                                   |
+| `npm test`                      | Exécuter les vérifications de logique du jeu                                     |
+| `npm run build`                 | Générer le site statique dans `dist/`                                            |
+| `npm run preview`               | Servir `dist/` localement, après le build                                        |
+| `npx prettier . --write`        | Reformater le code selon `.prettierrc.json` (Prettier est téléchargé à la volée) |
 
 Pour tester sur téléphone en Wi-Fi, utiliser `http://IP-LOCALE-DE-L-ORDINATEUR:5173`. L'accès dépend du réseau et du pare-feu. Pour **l'inclinaison**, préférer l'adresse HTTPS fournie par l'hébergeur : les capteurs peuvent être indisponibles en HTTP local. Activer « Incliner » par un appui et autoriser les capteurs si le navigateur le demande ; tenir le téléphone confortablement puis utiliser le bouton de recentrage. Le joystick reste une solution de repli.
 
@@ -105,6 +106,7 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 | `.github/workflows/check.yml` | Vérifications GitHub Actions à chaque push et pull request                  |
 | `vercel.json`                 | Configuration d'hébergement Vercel                                          |
 | `AGENTS.md`                   | Repères pour une personne ou un assistant qui reprend le code               |
+| `docs/`                       | Plan de restructuration retenu et checklist des essais sur téléphone        |
 | `dist/`                       | Résultat généré du build, ignoré par Git ; ne pas le modifier directement   |
 
 Le code du jeu et le moteur 3D sont conservés à l'identique dans `src/`. Seuls leur emplacement et les liens du point d'entrée ont changé. L'ancien hébergement n'est pas modifié par cet export. Le commit de référence du jeu est `dc6553e92c8b976716997d81c63007d369ee8e1d`.
