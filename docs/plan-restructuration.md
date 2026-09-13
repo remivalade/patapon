@@ -18,12 +18,12 @@ Ensuite, retour aux nouveautés pour Marceau.
 
 ## Les quatre étapes
 
-| Étape | Périmètre |
-| --- | --- |
-| 1. Référence et lisibilité | Taguer la version actuelle, formater le code dans un commit séparé, conserver une courte checklist téléphone. Pas de renommage ni de nettoyage logique dans ce commit. |
-| 2. Tests découplés | Exposer quelques opérations stables : créer une partie de test, avancer la simulation, envoyer une commande, consulter l'état. Les tests utilisent ces opérations au lieu de réécrire le texte de `world.js`. |
-| 3. Découpage limité | Extraire les responsabilités évidentes de `world.js` en conservant les calculs, les constantes et l'ordre des mises à jour. Quatre ou cinq fichiers supplémentaires sont une bonne cible, pas une obligation. |
-| 4. Mode joueur explicite | Centraliser marche, nage, monture et ascenseur, ainsi que leurs transitions. Conserver séparément la phase de l'expérience : introduction, arrivée, jeu. |
+| Étape                      | Périmètre                                                                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Référence et lisibilité | Taguer la version actuelle, formater le code dans un commit séparé, conserver une courte checklist téléphone. Pas de renommage ni de nettoyage logique dans ce commit.                                        |
+| 2. Tests découplés         | Exposer quelques opérations stables : créer une partie de test, avancer la simulation, envoyer une commande, consulter l'état. Les tests utilisent ces opérations au lieu de réécrire le texte de `world.js`. |
+| 3. Découpage limité        | Extraire les responsabilités évidentes de `world.js` en conservant les calculs, les constantes et l'ordre des mises à jour. Quatre ou cinq fichiers supplémentaires sont une bonne cible, pas une obligation. |
+| 4. Mode joueur explicite   | Centraliser marche, nage, monture et ascenseur, ainsi que leurs transitions. Conserver séparément la phase de l'expérience : introduction, arrivée, jeu.                                                      |
 
 ## Précisions
 

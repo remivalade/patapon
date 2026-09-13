@@ -29,14 +29,14 @@ Ouvrir **http://127.0.0.1:5173**, puis appuyer sur le bouton d'entrée. Arrêter
 
 **Aucun `npm install` n'est nécessaire** dans cet export : Three.js et sa licence sont inclus, les scripts utilisent uniquement Node.js. Aucun compte, serveur applicatif, clé API ou fichier `.env` n'est nécessaire pour jouer.
 
-| Commande | Utilité |
-| --- | --- |
-| `npm run dev` | Servir les sources localement ; recharger la page après une modification |
-| `npm run dev -- --host 0.0.0.0` | Autoriser les appareils du même réseau local à accéder au jeu |
-| `npm run check` | Vérifier la syntaxe JavaScript |
-| `npm test` | Exécuter les vérifications de logique du jeu |
-| `npm run build` | Générer le site statique dans `dist/` |
-| `npm run preview` | Servir `dist/` localement, après le build |
+| Commande                        | Utilité                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| `npm run dev`                   | Servir les sources localement ; recharger la page après une modification |
+| `npm run dev -- --host 0.0.0.0` | Autoriser les appareils du même réseau local à accéder au jeu            |
+| `npm run check`                 | Vérifier la syntaxe JavaScript                                           |
+| `npm test`                      | Exécuter les vérifications de logique du jeu                             |
+| `npm run build`                 | Générer le site statique dans `dist/`                                    |
+| `npm run preview`               | Servir `dist/` localement, après le build                                |
 
 Pour tester sur téléphone en Wi-Fi, utiliser `http://IP-LOCALE-DE-L-ORDINATEUR:5173`. L'accès dépend du réseau et du pare-feu. Pour **l'inclinaison**, préférer l'adresse HTTPS fournie par l'hébergeur : les capteurs peuvent être indisponibles en HTTP local. Activer « Incliner » par un appui et autoriser les capteurs si le navigateur le demande ; tenir le téléphone confortablement puis utiliser le bouton de recentrage. Le joystick reste une solution de repli.
 
@@ -64,16 +64,16 @@ Après la publication sur GitHub :
 2. Donner accès au dépôt `le-monde-de-patapon` et l'importer.
 3. Vérifier les réglages ci-dessous, puis lancer le déploiement.
 
-| Réglage | Valeur |
-| --- | --- |
-| Root Directory | Racine du dépôt, `.` |
-| Framework Preset | Other |
-| Node.js | 22.x |
-| Install Command | `node --version` (aucune dépendance à installer) |
-| Build Command | `npm run build` |
-| Output Directory | `dist` |
-| Variables d'environnement | Aucune |
-| Branche de production | `main` |
+| Réglage                   | Valeur                                           |
+| ------------------------- | ------------------------------------------------ |
+| Root Directory            | Racine du dépôt, `.`                             |
+| Framework Preset          | Other                                            |
+| Node.js                   | 22.x                                             |
+| Install Command           | `node --version` (aucune dépendance à installer) |
+| Build Command             | `npm run build`                                  |
+| Output Directory          | `dist`                                           |
+| Variables d'environnement | Aucune                                           |
+| Branche de production     | `main`                                           |
 
 Les commandes et le dossier de sortie sont déjà déclarés dans `vercel.json`. Ce projet est un **site statique JavaScript**, sans Vite dans cet export. Le build copie uniquement `index.html` et `src/` dans `dist/` ; il ne minifie ni ne regroupe les modules. Les tests, la documentation et l'historique Git ne font pas partie du site publié.
 
@@ -85,27 +85,27 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 
 ## Organisation du projet
 
-| Chemin | Responsabilité |
-| --- | --- |
-| `index.html` | Point d'entrée et interface : entrée, joystick, pédales, saut, interactions |
-| `src/world.js` | Assemblage des scènes, personnage, interactions, caméra et boucle de jeu |
-| `src/navigation.js` | Géométrie sphérique, déplacements, relief, eau, collisions et pont |
-| `src/handling.js` | Réponse des déplacements à pied et du speeder, accélération et freinage |
-| `src/tilt.js` | Capteurs d'orientation, permission, calibration et repli vers le joystick |
-| `src/expansion.js` | Modèles et comportement des animaux, speeder et ascenseur |
-| `src/landscape.js` | Grand lac/pont/île et système de jour/nuit |
-| `src/water.js` | Rendu et animation de l'eau |
-| `src/vegetation.js` | Variétés d'arbres, prairies fleuries, vent et papillons |
-| `src/effects.js` | Particules de déplacement, feuilles, lucioles et détails nocturnes |
-| `src/audio.js` | Ambiance et sons synthétisés avec Web Audio |
-| `src/style.css` | Présentation et disposition des contrôles, notamment sur mobile |
-| `src/vendor/` | Three.js r169 et sa licence MIT |
-| `scripts/` | Serveur local, génération du dossier à héberger, vérification syntaxique |
-| `tests/game-regression.mjs` | Vérifications automatisées des mécanismes existants |
-| `.github/workflows/check.yml` | Vérifications GitHub Actions à chaque push et pull request |
-| `vercel.json` | Configuration d'hébergement Vercel |
-| `AGENTS.md` | Repères pour une personne ou un assistant qui reprend le code |
-| `dist/` | Résultat généré du build, ignoré par Git ; ne pas le modifier directement |
+| Chemin                        | Responsabilité                                                              |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `index.html`                  | Point d'entrée et interface : entrée, joystick, pédales, saut, interactions |
+| `src/world.js`                | Assemblage des scènes, personnage, interactions, caméra et boucle de jeu    |
+| `src/navigation.js`           | Géométrie sphérique, déplacements, relief, eau, collisions et pont          |
+| `src/handling.js`             | Réponse des déplacements à pied et du speeder, accélération et freinage     |
+| `src/tilt.js`                 | Capteurs d'orientation, permission, calibration et repli vers le joystick   |
+| `src/expansion.js`            | Modèles et comportement des animaux, speeder et ascenseur                   |
+| `src/landscape.js`            | Grand lac/pont/île et système de jour/nuit                                  |
+| `src/water.js`                | Rendu et animation de l'eau                                                 |
+| `src/vegetation.js`           | Variétés d'arbres, prairies fleuries, vent et papillons                     |
+| `src/effects.js`              | Particules de déplacement, feuilles, lucioles et détails nocturnes          |
+| `src/audio.js`                | Ambiance et sons synthétisés avec Web Audio                                 |
+| `src/style.css`               | Présentation et disposition des contrôles, notamment sur mobile             |
+| `src/vendor/`                 | Three.js r169 et sa licence MIT                                             |
+| `scripts/`                    | Serveur local, génération du dossier à héberger, vérification syntaxique    |
+| `tests/game-regression.mjs`   | Vérifications automatisées des mécanismes existants                         |
+| `.github/workflows/check.yml` | Vérifications GitHub Actions à chaque push et pull request                  |
+| `vercel.json`                 | Configuration d'hébergement Vercel                                          |
+| `AGENTS.md`                   | Repères pour une personne ou un assistant qui reprend le code               |
+| `dist/`                       | Résultat généré du build, ignoré par Git ; ne pas le modifier directement   |
 
 Le code du jeu et le moteur 3D sont conservés à l'identique dans `src/`. Seuls leur emplacement et les liens du point d'entrée ont changé. L'ancien hébergement n'est pas modifié par cet export. Le commit de référence du jeu est `dc6553e92c8b976716997d81c63007d369ee8e1d`.
 

@@ -4,12 +4,67 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import * as THREE from '../src/vendor/three.module.min.js';
 const sourceRoot = new URL('../src/', import.meta.url);
-const nodes=new Map();function element(){return{style:{},hidden:true,disabled:false,textContent:'',classList:{toggle(){}},setAttribute(){},appendChild(){},addEventListener(type,fn){this[type]=fn},setPointerCapture(){},getBoundingClientRect(){return{left:0,top:0,width:126,height:126}}};}
-globalThis.document={getElementById(id){if(!nodes.has(id))nodes.set(id,element());return nodes.get(id)},addEventListener(){}};globalThis.window=globalThis;globalThis.innerWidth=844;globalThis.innerHeight=390;globalThis.devicePixelRatio=2;globalThis.addEventListener=()=>{};globalThis.removeEventListener=()=>{};globalThis.requestAnimationFrame=()=>{};
-let captured;class Renderer{constructor(){this.domElement=element();this.shadowMap={};}setPixelRatio(){}setSize(){}render(scene,camera){captured=scene;scene.updateMatrixWorld();camera.updateMatrixWorld();scene.traverse(o=>{assert.ok(o.position.toArray().every(Number.isFinite));if(o.geometry?.attributes.position)for(const p of o.geometry.attributes.position.array)assert.ok(Number.isFinite(p));});}}
-globalThis.PataponThree={...THREE,WebGLRenderer:Renderer};globalThis.checkAssert=assert;
-let src=fs.readFileSync(new URL('world.js', sourceRoot),'utf8').replace("import * as T from './vendor/three.module.min.js';",'const T=globalThis.PataponThree;').replaceAll(/'\.\/(\w+)\.js'/g,(_, name) => JSON.stringify(new URL(name + '.js', sourceRoot).href));
-src+=`\nimport {ROAD_AXIS} from '${new URL('navigation.js', sourceRoot).href}';\n;globalThis.runChecks=()=>{const assert=globalThis.checkAssert,results=[];beginWalk();expansion.updateAnimals(0,.01,player.position);
+const nodes = new Map();
+function element() {
+  return {
+    style: {},
+    hidden: true,
+    disabled: false,
+    textContent: '',
+    classList: { toggle() {} },
+    setAttribute() {},
+    appendChild() {},
+    addEventListener(type, fn) {
+      this[type] = fn;
+    },
+    setPointerCapture() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 126, height: 126 };
+    },
+  };
+}
+globalThis.document = {
+  getElementById(id) {
+    if (!nodes.has(id)) nodes.set(id, element());
+    return nodes.get(id);
+  },
+  addEventListener() {},
+};
+globalThis.window = globalThis;
+globalThis.innerWidth = 844;
+globalThis.innerHeight = 390;
+globalThis.devicePixelRatio = 2;
+globalThis.addEventListener = () => {};
+globalThis.removeEventListener = () => {};
+globalThis.requestAnimationFrame = () => {};
+let captured;
+class Renderer {
+  constructor() {
+    this.domElement = element();
+    this.shadowMap = {};
+  }
+  setPixelRatio() {}
+  setSize() {}
+  render(scene, camera) {
+    captured = scene;
+    scene.updateMatrixWorld();
+    camera.updateMatrixWorld();
+    scene.traverse((o) => {
+      assert.ok(o.position.toArray().every(Number.isFinite));
+      if (o.geometry?.attributes.position)
+        for (const p of o.geometry.attributes.position.array) assert.ok(Number.isFinite(p));
+    });
+  }
+}
+globalThis.PataponThree = { ...THREE, WebGLRenderer: Renderer };
+globalThis.checkAssert = assert;
+let src = fs
+  .readFileSync(new URL('world.js', sourceRoot), 'utf8')
+  .replace("import * as T from './vendor/three.module.min.js';", 'const T=globalThis.PataponThree;')
+  .replaceAll(/'\.\/(\w+)\.js'/g, (_, name) =>
+    JSON.stringify(new URL(name + '.js', sourceRoot).href),
+  );
+src += `\nimport {ROAD_AXIS} from '${new URL('navigation.js', sourceRoot).href}';\n;globalThis.runChecks=()=>{const assert=globalThis.checkAssert,results=[];beginWalk();expansion.updateAnimals(0,.01,player.position);
 // The full road can be driven without a border or obstacle on the carriageway.
 navNormal=normalAt(73,32);forward.set(0,0,-1).projectOnPlane(navNormal).normalize();player.position.copy(surface(navNormal));riding=true;bikeHeading.copy(forward);drive.speed=48;const start=navNormal.clone();keys.add('w');const frames=2400,dt=2*Math.PI*RADIUS/48/frames;for(let i=0;i<frames;i++)move(dt);keys.clear();assert.ok(navNormal.distanceTo(start)<.004,'Speeder full road circuit');results.push('full-speed road circuit');riding=false;
 // Spherical collision footprints must actually deflect movement.
@@ -75,5 +130,26 @@ state.riding=false;state.normal=normalAt(-29,20);state.position=surface(state.no
 const goldTree=forest.groups[2][0];state.normal=goldTree.n.clone();state.position=surface(state.normal);trailEffects.reset();const leavesBefore=trailEffects.stats.leaves;for(let i=0;i<15;i++)effectStep(.05);assert.ok(trailEffects.stats.leaves>leavesBefore,'Leaves fall near leafy trees');
 trailEffects.emit(state.normal,state.position,0,700);state.climb={};let alive=0;for(let i=0;i<170;i++){alive=effectStep(.05);assert.ok(alive<=320);for(const attr of Object.values(trailEffects.points.geometry.attributes))assert.ok(attr.array.every(Number.isFinite));}assert.equal(alive,0);assert.equal(trailEffects.particles.length,320);results.push('nearby falling leaves and bounded particle pool expires cleanly');
 return results;};`;
-try{await import('data:text/javascript;base64,'+Buffer.from(src).toString('base64'));}catch(e){console.error(e.message);process.exit(1)}
-let count=0,triangles=0;captured.traverse(o=>{if(o.geometry){count++;if(!o.isPoints)triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3*(o.count||1);}});console.log({meshes:count,triangles});try{console.log(globalThis.runChecks());}catch(e){console.error(e.message);process.exitCode=1;}
+try {
+  await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'));
+} catch (e) {
+  console.error(e.message);
+  process.exit(1);
+}
+let count = 0,
+  triangles = 0;
+captured.traverse((o) => {
+  if (o.geometry) {
+    count++;
+    if (!o.isPoints)
+      triangles +=
+        ((o.geometry.index?.count || o.geometry.attributes.position.count) / 3) * (o.count || 1);
+  }
+});
+console.log({ meshes: count, triangles });
+try {
+  console.log(globalThis.runChecks());
+} catch (e) {
+  console.error(e.message);
+  process.exitCode = 1;
+}

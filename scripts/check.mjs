@@ -7,7 +7,9 @@ async function check(folder) {
     const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), folder);
     if (entry.isDirectory()) await check(url);
     else if (/\.m?js$/.test(entry.name)) {
-      const result = spawnSync(process.execPath, ['--check', fileURLToPath(url)], { stdio: 'inherit' });
+      const result = spawnSync(process.execPath, ['--check', fileURLToPath(url)], {
+        stdio: 'inherit',
+      });
       if (result.error) throw result.error;
       if (result.status !== 0) process.exit(result.status || 1);
       count++;
