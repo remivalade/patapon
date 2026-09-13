@@ -568,6 +568,80 @@ check(
   },
 );
 
+check('sun control box: approach, first-person view, buttons and return', () => {
+  const { sunPanel, sun, dayNight, camera, player, panelStand, panelFocus } = parts;
+  game.resetHome();
+  const n = panelStand.clone().sub(CENTER).normalize();
+  game.place({ normal: n, position: surface(n) });
+  game.step(0.016);
+  assert.equal(game.getContext().type, 'panel');
+  assert.equal(game.getContext().text, 'Interagir');
+  game.contextAction();
+  assert.equal(s().mode, 'panel');
+  assert.equal(game.getContext().text, 'Retour');
+  game.updateHud();
+  assert.ok(hud('stick').hidden && hud('jump').hidden && !hud('action').hidden);
+  assert.ok(!player.visible, 'First person: Marceau is hidden');
+  steps(60);
+  const toPanel = panelFocus.clone().sub(camera.position);
+  assert.ok(toPanel.length() > 1.5 && toPanel.length() < 4.2, 'Camera close to the panel');
+  const view = new T.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  assert.ok(view.dot(toPanel.normalize()) > 0.99, 'Camera looks at the panel');
+  const here = s().position.clone();
+  game.press('w');
+  steps(10);
+  game.releaseKeys();
+  game.jump();
+  assert.ok(s().position.distanceTo(here) < 1e-9 && s().jumpVelocity === 0, 'Nothing moves');
+  // Colour: a tap on the button, as on a phone, cycles the sun colour.
+  const before = sun.colourIndex;
+  const p = sunPanel.buttons.color.getWorldPosition(new T.Vector3()).project(camera);
+  const x = ((p.x + 1) / 2) * innerWidth,
+    y = ((1 - p.y) / 2) * innerHeight;
+  canvas.pointerdown(touch(80, x, y));
+  canvas.pointerup(touch(80, x, y));
+  assert.equal(sun.colourIndex, before + 1, 'Tap on the colour button');
+  assert.equal(sun.solarMat.color.getHexString(), sun.colour.sun.slice(1));
+  assert.equal(sunPanel.buttons.color.material.emissive.getHexString(), sun.colour.halo.slice(1));
+  // Speed: the lamps follow the level and level 0 stops the cover.
+  while (dayNight.level !== 0) game.pressPanel('speed');
+  assert.ok(sunPanel.lamps.every((lamp) => lamp.material.emissiveIntensity === 0));
+  const home = s().position;
+  dayNight.update(1000, home);
+  const frozen = dayNight.direction.value.clone();
+  dayNight.update(1010, home);
+  assert.ok(dayNight.direction.value.distanceTo(frozen) < 1e-9, 'Stopped cover');
+  game.pressPanel('speed');
+  game.pressPanel('speed');
+  assert.equal(dayNight.speed, 1);
+  assert.equal(sunPanel.lamps.filter((lamp) => lamp.material.emissiveIntensity > 0).length, 2);
+  dayNight.update(1020, home);
+  assert.ok(dayNight.direction.value.distanceTo(frozen) > 0.1, 'Cover turns again');
+  // Disco: the perforated shell replaces the cover and the shaders know about it.
+  game.pressPanel('disco');
+  assert.ok(dayNight.discoOn && sunPanel.buttons.disco.material.emissiveIntensity > 0);
+  dayNight.update(1021, home);
+  dayNight.update(1024, home);
+  assert.ok(dayNight.disco.value > 0.95 && dayNight.shell.visible && !dayNight.cap.visible);
+  assert.equal(parts.lakeWater.uniforms.disco.value, dayNight.disco.value);
+  const shader = {
+    uniforms: {},
+    vertexShader: T.ShaderLib.standard.vertexShader,
+    fragmentShader: T.ShaderLib.standard.fragmentShader,
+  };
+  [...dayNight.patched][0].onBeforeCompile(shader);
+  assert.ok(shader.fragmentShader.includes('vec3 discoLight(vec3 d,float t)'));
+  assert.equal(shader.uniforms.disco, dayNight.disco);
+  game.pressPanel('disco');
+  dayNight.update(1025, home);
+  dayNight.update(1028, home);
+  assert.ok(dayNight.disco.value === 0 && !dayNight.shell.visible && dayNight.cap.visible);
+  game.contextAction();
+  assert.equal(s().mode, 'walking');
+  assert.ok(player.visible);
+  sun.setColour(0);
+});
+
 check('three tree silhouettes, clear flower fields and composed wind/night shaders', () => {
   const { forest, fields, collisions, dayNight } = parts;
   assert.ok(

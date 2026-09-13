@@ -29,6 +29,22 @@ export function shadeAt(t) {
 export function daylightAt(n, direction) {
   return 1 - T.MathUtils.smoothstep(n.dot(direction), -0.16, 0.16);
 }
+// Cover speeds selectable from the sun control box: stopped, slow, normal, fast, frantic.
+export const COVER_SPEEDS = [0, 0.3, 1, 3, 8];
+// Disco: a mirror ball. Given a unit direction from the sun centre and a time, returns the
+// colour of the light spot shining that way (black between spots). Shared by the terrain
+// shaders, the water and the perforated cover so holes and spots line up exactly.
+export const DISCO_GLSL = `vec3 discoLight(vec3 d,float t){
+float c=cos(t),s=sin(t);d=vec3(c*d.x-s*d.z,d.y,s*d.x+c*d.z);
+float lat=asin(clamp(d.y,-1.,1.)),lon=atan(d.z,d.x);
+float rowCoord=lat*3.1831+.5,row=floor(rowCoord);
+float nx=max(3.,floor(20.*cos(row/3.1831)));
+float colCoord=(lon/6.2832+.5)*nx,col=floor(colCoord);
+vec2 f=vec2(fract(colCoord)-.5,fract(rowCoord)-.5);
+float spot=1.-smoothstep(.2,.32,length(f));
+float h=fract(sin(dot(vec2(col,row),vec2(127.1,311.7)))*43758.5453);
+vec3 colour=.55+.45*cos(6.2832*(h+vec3(0.,.33,.67)));
+return colour*spot;}`;
 
 export function buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions }) {
   const bridgeSamples = [],
@@ -105,7 +121,14 @@ export function buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions }
 
 export function buildDayNight({ world, mesh, mat, beam, scene, waters }) {
   const direction = { value: shadeAt(0) },
-    center = { value: CENTER.clone() };
+    center = { value: CENTER.clone() },
+    disco = { value: 0 },
+    discoTime = { value: 0 };
+  // The cover turns at a chosen speed; time accumulates so a speed change never jumps.
+  let level = 2,
+    cycle = 0,
+    lastTime = null,
+    discoOn = false;
   const cap = new T.Group();
   cap.position.copy(CENTER);
   world.add(cap);
@@ -140,6 +163,22 @@ export function buildDayNight({ world, mesh, mat, beam, scene, waters }) {
     }
   }
   batchStatic(cap);
+  // Disco: the whole sun sits inside a dark shell pierced with holes; the same function
+  // that lights the spots on the ground decides where the holes are.
+  const shellMaterial = new T.ShaderMaterial({
+    uniforms: { disco, discoTime, center },
+    side: T.DoubleSide,
+    fog: false,
+    vertexShader:
+      'varying vec3 shellWorld;void main(){shellWorld=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader:
+      'uniform float disco;uniform float discoTime;uniform vec3 center;varying vec3 shellWorld;\n' +
+      DISCO_GLSL +
+      '\nvoid main(){vec3 d=normalize(shellWorld-center);vec3 spot=discoLight(d,discoTime);float lit=max(spot.r,max(spot.g,spot.b));if(lit>.35)discard;float facet=.5+.5*sin(d.x*40.)*sin(d.y*40.)*sin(d.z*40.);gl_FragColor=vec4(mix(vec3(.16,.19,.26),vec3(.55,.6,.72),facet*.35)+spot*.5,1.);}',
+  });
+  const shell = mesh(new T.SphereGeometry(34.5, 64, 40), shellMaterial, world, ...CENTER.toArray());
+  shell.visible = false;
+  shell.castShadow = shell.receiveShadow = false;
   // Analytic occlusion casts a hemisphere of night without costly cube shadow maps.
   // Evaluate per fragment so the giant terrain and instanced forests share a moving terminator.
   const patched = new Set();
@@ -153,6 +192,8 @@ export function buildDayNight({ world, mesh, mat, beam, scene, waters }) {
         previous.call(this, shader);
         shader.uniforms.shadeDirection = direction;
         shader.uniforms.solarCenter = center;
+        shader.uniforms.disco = disco;
+        shader.uniforms.discoTime = discoTime;
         shader.vertexShader = 'varying vec3 solarWorldPosition;\n' + shader.vertexShader;
         shader.vertexShader = shader.vertexShader.replace(
           '#include <project_vertex>',
@@ -164,20 +205,28 @@ export function buildDayNight({ world, mesh, mat, beam, scene, waters }) {
    #include <project_vertex>`,
         );
         shader.fragmentShader =
-          'uniform vec3 shadeDirection;uniform vec3 solarCenter;varying vec3 solarWorldPosition;\n' +
+          'uniform vec3 shadeDirection;uniform vec3 solarCenter;uniform float disco;uniform float discoTime;varying vec3 solarWorldPosition;\n' +
+          DISCO_GLSL +
+          '\n' +
           shader.fragmentShader;
         shader.fragmentShader = shader.fragmentShader.replace(
           '#include <aomap_fragment>',
           `#include <aomap_fragment>
    vec3 radial=solarWorldPosition-solarCenter;
-   float shade=smoothstep(-.16,.16,dot(normalize(radial),shadeDirection))*smoothstep(38.,55.,length(radial));
+   float solarReach=smoothstep(38.,55.,length(radial));
+   float shade=smoothstep(-.16,.16,dot(normalize(radial),shadeDirection))*solarReach;
+   vec3 discoSpot=discoLight(normalize(radial),discoTime);
+   float discoLit=max(discoSpot.r,max(discoSpot.g,discoSpot.b));
+   shade=mix(shade,(1.-discoLit)*solarReach,disco);
+   vec3 discoTint=mix(vec3(1.),discoSpot*1.6+vec3(.12),disco);
    reflectedLight.directDiffuse*=1.-shade*.975;
+   reflectedLight.directDiffuse*=discoTint;
    reflectedLight.directSpecular*=1.-shade*.975;
    reflectedLight.indirectDiffuse*=mix(vec3(1.),vec3(.13,.22,.4),shade);
    reflectedLight.indirectSpecular*=1.-shade*.8;`,
         );
       };
-      material.customProgramCacheKey = () => inheritedKey + '-patapon-moving-solar-cover-v1';
+      material.customProgramCacheKey = () => inheritedKey + '-patapon-moving-solar-cover-v2';
       material.needsUpdate = true;
     }
   });
@@ -186,20 +235,59 @@ export function buildDayNight({ world, mesh, mat, beam, scene, waters }) {
     dayBackground = new T.Color('#aabca0'),
     nightBackground = new T.Color('#15263c');
   function update(t, playerPosition) {
-    direction.value.copy(shadeAt(t));
+    const dt = lastTime === null ? 0 : t - lastTime;
+    lastTime = t;
+    cycle += dt * COVER_SPEEDS[level];
+    direction.value.copy(shadeAt(cycle));
     cap.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), direction.value);
+    // The disco fades in and out over about a second; its spots keep turning slowly.
+    const target = discoOn ? 1 : 0;
+    disco.value += (target - disco.value) * Math.min(1, Math.abs(dt) * 1.6);
+    if (Math.abs(disco.value - target) < 0.01) disco.value = target;
+    discoTime.value += Math.abs(dt) * 0.35;
+    shell.visible = disco.value > 0.01;
+    cap.visible = disco.value < 0.5;
     const n = playerPosition.clone().sub(CENTER).normalize(),
-      light = playerPosition.distanceTo(CENTER) < 40 ? 1 : daylightAt(n, direction.value);
+      light =
+        (playerPosition.distanceTo(CENTER) < 40 ? 1 : daylightAt(n, direction.value)) *
+        (1 - disco.value);
     if (scene.fog) scene.fog.color.copy(nightFog).lerp(dayFog, light);
     if (scene.background?.isColor)
       scene.background.copy(nightBackground).lerp(dayBackground, light);
     for (const water of waters) {
       water.uniforms.shadeDirection.value.copy(direction.value);
       water.uniforms.mist.value.copy(scene.fog?.color ?? dayFog);
+      water.uniforms.disco.value = disco.value;
+      water.uniforms.discoTime.value = discoTime.value;
     }
     return light;
   }
-  return { cap, direction, update, patched };
+  function setSpeedLevel(next) {
+    level = Math.max(0, Math.min(COVER_SPEEDS.length - 1, next));
+  }
+  function setDisco(on) {
+    discoOn = !!on;
+  }
+  return {
+    cap,
+    shell,
+    direction,
+    disco,
+    discoTime,
+    update,
+    patched,
+    setSpeedLevel,
+    setDisco,
+    get level() {
+      return level;
+    },
+    get speed() {
+      return COVER_SPEEDS[level];
+    },
+    get discoOn() {
+      return discoOn;
+    },
+  };
 }
 
 // Batch this static scenery by material to keep the bridge and cover cheap on mobile.

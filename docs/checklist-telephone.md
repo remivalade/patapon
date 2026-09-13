@@ -13,5 +13,7 @@
 - [ ] Animal monté : il fonce tout seul, le frein le calme, il repart quand on lâche ; traits de vitesse et galop visibles, fluidité correcte
 - [ ] Pont et île
 - [ ] Ascenseur jusqu'à la salle du soleil et retour
+- [ ] Boîtier du soleil : « Interagir » près du pupitre, vue subjective lisible en portrait et en paysage, les trois boutons répondent au toucher, « Retour » rend la main
+- [ ] Mode disco : coque percée autour du soleil, taches colorées sur tout le monde, fluidité correcte, retour à la normale
 - [ ] Cycle jour/nuit visible
 - [ ] Retour dans le jeu après mise en veille

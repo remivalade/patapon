@@ -14,6 +14,7 @@ Le terrain est **la face intérieure d'une sphère** : le sol opposé est visibl
 - Vaches et moutons interactifs et montables. Ils n'aiment pas ça : une fois en selle, l'animal s'emballe et fonce tout seul, plus vite que le speeder. On le dirige, on freine pour le calmer, on peut sauter. Traits de vitesse, champ de vision élargi et poussière soulignent la course ; l'animal galope avec rebond, tangage et tête tendue.
 - Route circulaire, grand lac à l'opposé de la maison, pont et île arborée.
 - Tour de verre et ascenseur vers la salle de contrôle à l'intérieur du soleil.
+- Boîtier de commande du soleil au pied de la tour, à côté du bouton d'appel : en vue subjective, un bouton change la couleur du soleil (le bouton prend la couleur actuelle), un bouton règle la vitesse du cache jour/nuit (arrêt, lent, normal, rapide, très rapide, quatre lampes l'indiquent), et un bouton lance le mode disco : le soleil se retrouve dans une coque percée de trous et le monde entier est éclairé par des taches colorées tournantes.
 - Cache solaire mobile produisant un cycle jour/nuit.
 - Variétés d'arbres, champs de fleurs, papillons, lucioles, vent, poussière, éclaboussures et ambiance sonore.
 
@@ -95,13 +96,14 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 | `src/exterior.js`             | Espace autour de l'astéroïde : ciel, étoiles, rocher, porte d'entrée, astéroïdes voisins                                                                                                                |
 | `src/habitat.js`              | Face intérieure habitée : lumières, terrain, forêts, rochers, lacs, tour, tunnel, fleurs ; assemble le village et le soleil                                                                             |
 | `src/village.js`              | Pierres de gué, cabane, transat, Patapon et son salut, vaisseau garé                                                                                                                                    |
-| `src/sun.js`                  | Soleil artificiel : sphère, halo, lueur, poussières et intérieur                                                                                                                                        |
+| `src/sun.js`                  | Soleil artificiel : sphère, halo, lueur, poussières, intérieur et palette de couleurs                                                                                                                   |
+| `src/sunpanel.js`             | Boîtier de commande du soleil : pupitre, panneau et trois boutons                                                                                                                                       |
 | `src/marceau.js`              | Modèle de Marceau et son ombre au sol                                                                                                                                                                   |
 | `src/navigation.js`           | Géométrie sphérique, déplacements, relief, eau, collisions et pont                                                                                                                                      |
 | `src/handling.js`             | Réponse des déplacements à pied et des montures : un profil de conduite par monture (`MOUNTS`), accélération et freinage                                                                                |
 | `src/tilt.js`                 | Capteurs d'orientation, permission, calibration et repli vers le joystick                                                                                                                               |
 | `src/expansion.js`            | Modèles et comportement des animaux, speeder et ascenseur                                                                                                                                               |
-| `src/landscape.js`            | Grand lac/pont/île et système de jour/nuit                                                                                                                                                              |
+| `src/landscape.js`            | Grand lac/pont/île, système de jour/nuit, vitesse du cache et éclairage disco                                                                                                                           |
 | `src/water.js`                | Rendu et animation de l'eau                                                                                                                                                                             |
 | `src/vegetation.js`           | Variétés d'arbres, prairies fleuries, vent et papillons                                                                                                                                                 |
 | `src/effects.js`              | Particules de déplacement, feuilles, lucioles et détails nocturnes                                                                                                                                      |
@@ -121,9 +123,9 @@ Le code du jeu et le moteur 3D sont conservés à l'identique dans `src/`. Seuls
 
 ## Contrôles
 
-Sur téléphone : joystick à gauche pour marcher, glissement sur la partie droite pour regarder, bouton de saut et bouton contextuel près d'un véhicule, d'un animal ou de l'ascenseur. Toucher une vache ou un mouton provoque sa réaction sonore. Sur le speeder, utiliser les pédales à droite ; l'inclinaison se sélectionne avec « Incliner ». Sur un animal, il n'y a pas d'accélérateur : il fonce tout seul, la pédale de frein le ralentit tant qu'on la tient, et le saut reste disponible.
+Sur téléphone : joystick à gauche pour marcher, glissement sur la partie droite pour regarder, bouton de saut et bouton contextuel près d'un véhicule, d'un animal ou de l'ascenseur. Toucher une vache ou un mouton provoque sa réaction sonore. Sur le speeder, utiliser les pédales à droite ; l'inclinaison se sélectionne avec « Incliner ». Sur un animal, il n'y a pas d'accélérateur : il fonce tout seul, la pédale de frein le ralentit tant qu'on la tient, et le saut reste disponible. Près du boîtier du soleil, le bouton contextuel « Interagir » passe en vue subjective ; on touche les boutons du panneau à l'écran, et « Retour » rend la main.
 
-Sur ordinateur : flèches ou touches de déplacement (ZQSD/WASD), espace pour sauter, E pour l'action contextuelle ; cliquer-glisser pour regarder. Sur un animal, S ou flèche bas freine. Les boutons à l'écran restent utilisables.
+Sur ordinateur : flèches ou touches de déplacement (ZQSD/WASD), espace pour sauter, E pour l'action contextuelle ; cliquer-glisser pour regarder. Sur un animal, S ou flèche bas freine. Devant le boîtier du soleil, E ouvre et ferme la vue, 1, 2 et 3 appuient sur les boutons, Échap referme. Les boutons à l'écran restent utilisables.
 
 ## Vérifications et limites
 
