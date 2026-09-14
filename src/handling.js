@@ -31,6 +31,17 @@ export const MOUNTS = {
     charge: true,
     agility: 1.3,
   },
+  // Rowing: slow, drifts to a stop, only on water.
+  boat: {
+    maxSpeed: 14,
+    reverseSpeed: 4,
+    acceleration: 7,
+    coastDeceleration: 5,
+    brakeDeceleration: 10,
+    reverseAcceleration: 4,
+    agility: 1.5,
+    water: true,
+  },
 };
 export function approach(value, target, amount) {
   return value < target ? Math.min(target, value + amount) : Math.max(target, value - amount);

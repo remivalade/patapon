@@ -11,6 +11,7 @@ import { buildExterior } from './exterior.js';
 import { buildHabitat } from './habitat.js';
 import { buildMarceau } from './marceau.js';
 import { createShadows } from './shadows.js';
+import { createPost } from './post.js';
 import {
   RADIUS,
   CENTER,
@@ -85,11 +86,16 @@ export function createGame({ renderer }) {
     animatePatapon,
     sunPanel,
     lights,
+    mountain,
+    clouds,
+    boat,
   } = habitat;
   const { solarMat, halo, innerSun, sunCage, sunInteriorUniforms } = sun;
   // Real shadows: one directional light following Marceau; its colour follows the sun.
   const shadows = createShadows({ renderer, world, colour: sun.colour.light });
   lights.shadowLight = shadows.light;
+  // One full-screen pass: tone mapping, grade and vignette.
+  const post = createPost({ renderer, mobile: shadows.mobile });
   function updateSunEffects(t) {
     sun.update(t, dayNight.direction.value, dayNight.disco.value);
   }
@@ -163,7 +169,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
   // needs. Jumping is not a mode: its height and velocity live alongside the mode and are
   // allowed while walking or riding an animal.
   //   { type: 'walking' } | { type: 'swimming' }
-  //   { type: 'riding', animal }   animal is null on the speeder
+  //   { type: 'riding', animal, vehicle }   animal, or vehicle 'speeder' | 'boat'
   //   { type: 'lift', climb }      climb: local tower coordinates and onPlatform
   //   { type: 'panel' }            standing at the sun control box, first-person view
   let playerMode = { type: 'walking' };
@@ -171,6 +177,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
   let riding = false,
     swimming = false,
     mountedAnimal = null,
+    mountedVehicle = null,
     climb = null;
   let jumpHeight = 0,
     jumpVelocity = 0;
@@ -202,12 +209,17 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     riding = next.type === 'riding';
     swimming = next.type === 'swimming';
     mountedAnimal = riding ? next.animal : null;
+    mountedVehicle = riding && !next.animal ? (next.vehicle ?? 'speeder') : null;
     climb = next.type === 'lift' ? next.climb : null;
     if (!riding) setRush(0);
   }
   // The handling numbers of whatever the player is riding.
   function mountProfile() {
-    return mountedAnimal ? MOUNTS[mountedAnimal.kind] : MOUNTS.speeder;
+    if (mountedAnimal) return MOUNTS[mountedAnimal.kind];
+    return mountedVehicle === 'boat' ? MOUNTS.boat : MOUNTS.speeder;
+  }
+  function vehicleObject(kind) {
+    return kind === 'boat' ? boat.root : expansion.bike;
   }
   function rideRatio() {
     return Math.abs(drive.speed) / mountProfile().maxSpeed;
@@ -261,6 +273,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.65));
     renderer.setSize(innerWidth, innerHeight);
+    post.resize();
   }
   addEventListener('resize', resize);
   if (window.visualViewport) visualViewport.addEventListener('resize', resize);
@@ -316,6 +329,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     const parked = normalAt(64, 10);
     expansion.bike.position.copy(surface(parked, 1));
     expansion.bike.quaternion.copy(orientation(parked));
+    boat.root.position.copy(surface(boat.mooring, lakeDepth(boat.mooring) + 0.24));
+    boat.root.quaternion.copy(orientation(boat.mooring));
     jumpHeight = jumpVelocity = 0;
     navNormal = normalAt(28, 12);
     forward.set(0, 0, -1).projectOnPlane(navNormal).normalize();
@@ -350,7 +365,21 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     } else lift.target = climb ? TOWER_HEIGHT : 0;
   }
   function bikeAction() {
+    vehicleAction('speeder');
+  }
+  function boatAction() {
+    vehicleAction('boat');
+  }
+  // Mount or leave the speeder or the boat. Leaving the boat drops the player into the water
+  // where it is (swimming, or wading near the shore); leaving the speeder looks for a free
+  // spot around it.
+  function vehicleAction(kind) {
     if (climb) return;
+    if (riding && mountedVehicle === 'boat') {
+      setMode({ type: 'walking' });
+      player.position.copy(surface(navNormal, lakeDepth(navNormal) + 0.24));
+      return;
+    }
     if (riding) {
       const right = forward.clone().cross(activeUp()).normalize();
       for (let i = 0; i < 8; i++) {
@@ -367,14 +396,11 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       }
       return;
     }
-    if (player.position.distanceTo(expansion.bike.position) > 8) return;
-    navNormal = expansion.bike.position.clone().sub(CENTER).normalize();
-    forward
-      .set(0, 0, 1)
-      .applyQuaternion(expansion.bike.quaternion)
-      .projectOnPlane(navNormal)
-      .normalize();
-    setMode({ type: 'riding', animal: null });
+    const vehicle = vehicleObject(kind);
+    if (player.position.distanceTo(vehicle.position) > 8) return;
+    navNormal = vehicle.position.clone().sub(CENTER).normalize();
+    forward.set(0, 0, 1).applyQuaternion(vehicle.quaternion).projectOnPlane(navNormal).normalize();
+    setMode({ type: 'riding', animal: null, vehicle: kind });
     bikeHeading.copy(forward);
   }
   // A released animal stays where it was ridden, facing the last heading.
@@ -413,13 +439,14 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     if (phase !== 'walk') return;
     const choice = getContext();
     if (choice?.type === 'bike') bikeAction();
+    else if (choice?.type === 'boat') boatAction();
     else if (choice?.type === 'lift' || choice?.type === 'call') liftAction();
     else if (choice?.type === 'panel') playerMode.type === 'panel' ? closePanel() : openPanel();
     else if (choice?.animal) mountAnimal(choice.animal);
   }
   function getContext() {
     if (playerMode.type === 'panel') return { type: 'panel', text: 'Retour' };
-    if (riding) return { type: 'bike', text: 'Descendre' };
+    if (riding) return { type: mountedVehicle === 'boat' ? 'boat' : 'bike', text: 'Descendre' };
     if (climb)
       return {
         type: 'lift',
@@ -446,6 +473,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       };
     if (player.position.distanceTo(expansion.bike.position) < 8)
       return { type: 'bike', text: 'Conduire' };
+    if (player.position.distanceTo(boat.root.position) < 8) return { type: 'boat', text: 'Ramer' };
     let closest = null,
       d = 8;
     for (const a of expansion.animals) {
@@ -489,6 +517,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     const targets = [
       ...expansion.animals.map((a) => a.root),
       expansion.bike,
+      boat.root,
       expansion.lift.button,
       ...towerGroup.children.filter((o) => o.userData.interaction === 'call'),
     ];
@@ -501,6 +530,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     }
     const kind = hit.object.userData.interaction;
     if (kind === 'bike') bikeAction();
+    else if (kind === 'boat') boatAction();
     else if ((kind === 'lift' || kind === 'call') && player.position.distanceTo(hit.point) < 14)
       liftAction();
   }
@@ -823,6 +853,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     return true;
   }
   function safeSurface(n, radius) {
+    if (mountedVehicle === 'boat') return lakeDepth(n) > 0.35 && !surfaceBlocked(n, radius);
     if (
       jumpHeight < 1.4 &&
       bridgeHeight(navNormal) > 1 &&
@@ -1023,7 +1054,9 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
             : 0;
       const ridingHeight = mountedAnimal
         ? (mountedAnimal.kind === 'cow' ? 1.6 : 0.95) + animalGround(navNormal) + mountBob
-        : 1.05 + (roadOffset(navNormal) > 0 ? roadOffset(navNormal) : hoverBase(navNormal));
+        : mountedVehicle === 'boat'
+          ? depth + 0.24 + 0.55 + Math.sin(clock.elapsedTime * 1.7) * 0.06
+          : 1.05 + (roadOffset(navNormal) > 0 ? roadOffset(navNormal) : hoverBase(navNormal));
       player.position.copy(surface(navNormal, (riding ? ridingHeight : waterHeight) + jumpHeight));
       if (!riding && depth === 0 && jumpHeight < 0.05) {
         const local = towerLocal(player.position);
@@ -1094,6 +1127,14 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
                 : 0.4
               : Math.sin(walk + (front ? 0 : Math.PI * 0.85) + lead) * 0.75 * moving;
         });
+      } else if (mountedVehicle === 'boat') {
+        boat.root.position.copy(
+          surface(
+            navNormal,
+            lakeDepth(navNormal) + 0.24 + Math.sin(clock.elapsedTime * 1.7) * 0.06,
+          ),
+        );
+        boat.root.quaternion.copy(player.quaternion);
       } else {
         expansion.bike.position.copy(
           surface(
@@ -1192,11 +1233,15 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       if (u >= 7) beginWalk();
     } else move(dt);
     if (world.visible) updateWorld(t, dt, real);
-    renderer.render(scene, camera);
+    post.render(scene, camera);
   }
   // Everything that lives in the habitat advances here, after the player has moved.
   function updateWorld(t, dt, realDt = dt) {
     const daylight = dayNight.update(t, player.position);
+    lights.hemisphere.position.copy(activeUp());
+    clouds.update(t);
+    mountain.update(t);
+    boat.animate(t, mountedVehicle === 'boat' && Math.abs(drive.speed) > 0.5);
     shadows.update({
       position: player.position,
       up: activeUp(),
@@ -1231,7 +1276,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     ambience.update(
       t,
       player.position.distanceTo(surfacePoint(-29, -15)),
-      riding && !mountedAnimal ? 0 : player.position.distanceTo(ship.position),
+      mountedVehicle === 'speeder' ? 0 : player.position.distanceTo(ship.position),
       player.position.distanceTo(CENTER),
       phase === 'walk' || phase === 'reveal',
     );
@@ -1269,6 +1314,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       riding,
       swimming,
       mountedAnimal,
+      vehicle: mountedVehicle,
       climb,
       jumpHeight,
       jumpVelocity,
@@ -1298,6 +1344,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     jump,
     contextAction,
     bikeAction,
+    boatAction,
     liftAction,
     greetAnimal,
     getContext,
@@ -1336,6 +1383,10 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       sunPanel,
       shadows,
       lights,
+      post,
+      boat,
+      clouds,
+      mountain,
       panelStand,
       panelFocus,
       player,

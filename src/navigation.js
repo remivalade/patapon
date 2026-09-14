@@ -15,19 +15,31 @@ export function chart(n) {
     s = Math.hypot(n.x, n.z);
   return s < 1e-8 ? { x: 0, z: 0 } : { x: (n.x / s) * a * RADIUS, z: (n.z / s) * a * RADIUS };
 }
+// Height of the ground above the bare sphere (positive = towards the centre).
+// Flat around the village, the meadow lakes and the tunnel; rolling hills elsewhere; the
+// mountain above the big lake with its spring and stream bed; lakes dug below.
 export function relief(n) {
   const distance = Math.acos(T.MathUtils.clamp(-n.y, -1, 1)) * RADIUS;
-  const blend = T.MathUtils.smoothstep(distance, 115, 220);
-  const base =
+  let blend = T.MathUtils.smoothstep(distance, 115, 220);
+  if (distance < 200) {
+    // Keep the tunnel and its approach flat.
+    const c = chart(n),
+      dz = c.z < 70 ? 70 - c.z : c.z > 165 ? c.z - 165 : 0,
+      tunnel = Math.hypot(c.x, dz);
+    blend *= T.MathUtils.smoothstep(tunnel, 18, 42);
+  }
+  const hills =
     blend *
-    (3 +
-      2 * Math.sin(n.x * 13 + n.z * 4) * Math.cos(n.y * 11) +
-      1.2 * Math.sin(n.z * 19 + n.y * 7));
+    (4 +
+      3 * Math.sin(n.x * 7 + n.z * 3) * Math.cos(n.y * 6) +
+      1.5 * Math.sin(n.z * 11 + n.y * 5) +
+      0.8 * Math.sin(n.x * 23 - n.z * 17));
   const r = bigLakeRadius(n),
     island = islandDistance(n);
   const land =
-    base * T.MathUtils.smoothstep(r, 1, 1.14) + 2.2 * (1 - T.MathUtils.smoothstep(island, 10, 19));
-  return land - lakeDepth(n);
+    (hills + mountainHeight(n)) * T.MathUtils.smoothstep(r, 1, 1.14) +
+    2.2 * (1 - T.MathUtils.smoothstep(island, 10, 19));
+  return land - lakeDepth(n) - streamBed(n);
 }
 export function surface(n, height = 0) {
   return n
@@ -67,8 +79,8 @@ export function lakeDepth(n) {
   return (
     (r < 1 ? 4 * T.MathUtils.smoothstep(1 - r, 0, 0.65) : 0) +
     (big < 1
-      ? 8 *
-        T.MathUtils.smoothstep(1 - big, 0, 0.24) *
+      ? 10 *
+        T.MathUtils.smoothstep(1 - big, 0, 0.2) *
         T.MathUtils.smoothstep(islandDistance(n), 17, 25)
       : 0)
   );
@@ -173,12 +185,54 @@ export function bigLakeChart(n) {
     ? { x: dot > 0 ? 0 : 2000, z: 0 }
     : { x: (n.dot(LAKE_X) / d) * a * RADIUS, z: (n.dot(LAKE_Z) / d) * a * RADIUS };
 }
+// The big lake is wide enough to row across; the road crosses it on a long causeway.
+export const LAKE_RX = 175,
+  LAKE_RZ = 135;
 export function bigLakeRadius(n) {
-  if (n.dot(BIG_LAKE) < 0.8) return 10;
+  if (n.dot(BIG_LAKE) < 0.6) return 10;
   const p = bigLakeChart(n);
-  return Math.hypot(p.x / 110, p.z / 90);
+  return Math.hypot(p.x / LAKE_RX, p.z / LAKE_RZ);
 }
-export const ISLAND = bigLakeNormal(35, 8);
+export const ISLAND_CHART = { x: 58, z: 14 };
+export const ISLAND = bigLakeNormal(ISLAND_CHART.x, ISLAND_CHART.z);
+// The mountain rises beside the far shore, off the road, with a spring at its top.
+export const MOUNTAIN_CHART = { x: 62, z: -180 };
+export const MOUNTAIN = bigLakeNormal(MOUNTAIN_CHART.x, MOUNTAIN_CHART.z);
+export const MOUNTAIN_RADIUS = 52,
+  MOUNTAIN_HEIGHT = 30;
+export function mountainDistance(n) {
+  return Math.acos(T.MathUtils.clamp(n.dot(MOUNTAIN), -1, 1)) * RADIUS;
+}
+export function mountainHeight(n) {
+  const d = mountainDistance(n);
+  if (d > MOUNTAIN_RADIUS) return 0;
+  const shape = Math.pow(T.MathUtils.smoothstep(1 - d / MOUNTAIN_RADIUS, 0, 1), 1.5);
+  const ridges = (1 - shape) * shape * 9 * Math.sin(n.x * 41 + n.z * 37) * Math.cos(n.y * 29);
+  const basin = 1.3 * (1 - T.MathUtils.smoothstep(d, 2.6, 4.6));
+  return MOUNTAIN_HEIGHT * shape + ridges - basin;
+}
+// The stream runs from the spring down to the shore along a gentle S; t goes 0 → 1.
+export const STREAM_LENGTH = 62;
+export function streamPoint(t) {
+  const shoreX = 45,
+    shoreZ = -127;
+  const x = MOUNTAIN_CHART.x + (shoreX - MOUNTAIN_CHART.x) * t + 5 * Math.sin(t * Math.PI * 2.2),
+    z = MOUNTAIN_CHART.z + 3 + (shoreZ - MOUNTAIN_CHART.z - 3) * t;
+  return bigLakeNormal(x, z);
+}
+export function streamDistance(n) {
+  if (n.dot(MOUNTAIN) < 0.9) return 1000;
+  let best = 1000;
+  for (let i = 0; i <= 24; i++) {
+    const d = Math.acos(T.MathUtils.clamp(n.dot(streamPoint(i / 24)), -1, 1)) * RADIUS;
+    if (d < best) best = d;
+  }
+  return best;
+}
+export function streamBed(n) {
+  const d = streamDistance(n);
+  return d > 3.2 ? 0 : 1.1 * (1 - T.MathUtils.smoothstep(d, 1.1, 3.2));
+}
 export function islandDistance(n) {
   return Math.acos(T.MathUtils.clamp(n.dot(ISLAND), -1, 1)) * RADIUS;
 }
@@ -188,7 +242,7 @@ export function lakeRadius(n) {
 export function bridgeHeight(n) {
   const r = bigLakeRadius(n);
   return roadDistance(n) < 5.8 && r < 1.1
-    ? T.MathUtils.smoothstep(1.1 - r, 0, 0.22) * (3 + 4 * Math.max(0, 1 - r))
+    ? T.MathUtils.smoothstep(1.1 - r, 0, 0.22) * (4 + 5 * Math.max(0, 1 - r))
     : 0;
 }
 export function roadOffset(n) {
