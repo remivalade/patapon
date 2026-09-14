@@ -7,6 +7,9 @@ import { placeOnGlobe } from './builders.js';
 import { buildVillage } from './village.js';
 import { buildSun } from './sun.js';
 import { buildSunPanel } from './sunpanel.js';
+import { buildMountain } from './mountain.js';
+import { buildClouds } from './clouds.js';
+import { buildBoat } from './boat.js';
 import {
   RADIUS,
   CENTER,
@@ -14,6 +17,8 @@ import {
   normalAt,
   chart,
   relief,
+  streamDistance,
+  smallLakeRadius,
   surface,
   surfacePoint,
   orientation,
@@ -27,23 +32,55 @@ import {
 export function buildHabitat({ world, builders, rand, collisions, camera }) {
   const { mat, mesh, box, ball, cyl, beam } = builders;
   const dummy = new T.Object3D();
-  const ambient = new T.AmbientLight('#fff0d4', 1.6);
+  // A little flat ambient plus a hemisphere light: cool sky above, warm ground below, so
+  // faces read by their orientation and shadows lean cold. world.js keeps it aligned with
+  // the local up as the player walks around the globe.
+  const ambient = new T.AmbientLight('#fff0d4', 0.3);
+  const hemisphere = new T.HemisphereLight('#d9e6ff', '#c9b48a', 1.4);
+  world.add(hemisphere);
   world.add(ambient);
   // Part of the sun's light comes from the shadow-casting directional light (world.js).
-  const centralLight = new T.PointLight('#ffe3a4', 1.3, 0, 0);
+  const centralLight = new T.PointLight('#ffe3a4', 1.1, 0, 0);
   centralLight.position.copy(CENTER);
   world.add(centralLight);
   function terrainMesh() {
-    const g = new T.SphereGeometry(RADIUS, 144, 96),
+    // Finer than before so the hills and the mountain read; colours come from the ground
+    // itself: altitude, slope, water nearby, the stream bed and the rocky summit.
+    const g = new T.SphereGeometry(RADIUS, 256, 160),
       p = g.attributes.position,
       colors = [],
-      color = new T.Color();
+      color = new T.Color(),
+      tint = new T.Color(),
+      eps = 1.6 / RADIUS;
+    const rocky = new T.Color().setHSL(0.08, 0.12, 0.42),
+      summit = new T.Color().setHSL(0.1, 0.06, 0.63),
+      sand = new T.Color().setHSL(0.12, 0.38, 0.6),
+      lakeBed = new T.Color().setHSL(0.47, 0.32, 0.3);
     for (let i = 0; i < p.count; i++) {
       const n = new T.Vector3().fromBufferAttribute(p, i).normalize();
       const h = relief(n);
       p.setXYZ(i, n.x * (RADIUS - h), n.y * (RADIUS - h), n.z * (RADIUS - h));
       const patch = Math.sin(n.x * 17 + n.y * 5) * Math.cos(n.z * 13 - n.y * 8);
-      color.setHSL(0.205 + patch * 0.025, 0.33 + patch * 0.07, 0.39 + patch * 0.06);
+      const e1 = new T.Vector3(1, 0, 0).projectOnPlane(n).normalize(),
+        e2 = n.clone().cross(e1);
+      if (e1.lengthSq() < 0.5) e1.set(0, 0, 1).projectOnPlane(n).normalize();
+      const dh1 = relief(n.clone().addScaledVector(e1, eps).normalize()) - h,
+        dh2 = relief(n.clone().addScaledVector(e2, eps).normalize()) - h,
+        slope = Math.hypot(dh1, dh2) / 1.6;
+      const high = T.MathUtils.clamp(h / 12, 0, 1);
+      color.setHSL(
+        0.205 + patch * 0.025 - high * 0.012,
+        0.33 + patch * 0.07 + high * 0.04,
+        0.39 + patch * 0.06 + high * 0.04,
+      );
+      color.lerp(rocky, T.MathUtils.smoothstep(slope, 0.5, 1));
+      color.lerp(summit, T.MathUtils.smoothstep(h, 21, 28));
+      const big = bigLakeRadius(n),
+        small = smallLakeRadius(n),
+        shore = Math.min(big, small);
+      color.lerp(sand, 1 - T.MathUtils.smoothstep(Math.abs(shore - 1.02), 0.02, 0.07));
+      color.lerp(lakeBed, 1 - T.MathUtils.smoothstep(shore, 0.94, 1));
+      if (streamDistance(n) < 2.6) color.multiplyScalar(0.82);
       colors.push(color.r, color.g, color.b);
     }
     g.setAttribute('color', new T.Float32BufferAttribute(colors, 3));
@@ -189,7 +226,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   world.add(towerGroup);
   const expansion = buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, towerGroup });
   const landscape = buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions });
-  const lights = { ambient, centralLight };
+  const lights = { ambient, hemisphere, centralLight };
   const sun = buildSun({ world, mesh, rand, camera, lights });
   const control = new T.Group();
   control.position.set(0, TOWER_HEIGHT, 0);
@@ -270,11 +307,18 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   world.add(pollen);
   // The sun control box stands beside the lift call button.
   const sunPanel = buildSunPanel({ towerGroup, builders });
+  // The mountain's spring and stream, the clouds and the rowing boat.
+  const mountain = buildMountain({ world, builders, collisions, rand });
+  const clouds = buildClouds({ world, rand });
+  const boat = buildBoat({ world, builders });
   return {
     trees,
     forest,
     sunPanel,
     lights,
+    mountain,
+    clouds,
+    boat,
     lakeWater,
     distantWater,
     towerGroup,

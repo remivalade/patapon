@@ -11,6 +11,7 @@ import {
   bigLakeRadius,
   bridgeHeight,
   ISLAND,
+  ISLAND_CHART,
   bigLakeNormal,
 } from './navigation.js';
 
@@ -97,15 +98,15 @@ export function buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions }
   }
   // A handful of distinct low-poly trees on the raised island.
   const islandTrees = [
-    [35, 8, 1.25],
-    [28, 3, 0.95],
-    [42, 5, 1.05],
-    [33, 17, 0.8],
-    [44, 15, 0.75],
-    [28, 13, 0.7],
+    [0, 0, 1.25],
+    [-7, -5, 0.95],
+    [7, -3, 1.05],
+    [-2, 9, 0.8],
+    [9, 7, 0.75],
+    [-7, 5, 0.7],
   ];
-  for (const [x, z, s] of islandTrees) {
-    const n = bigLakeNormal(x, z),
+  for (const [dx, dz, s] of islandTrees) {
+    const n = bigLakeNormal(ISLAND_CHART.x + dx, ISLAND_CHART.z + dz),
       tree = new T.Group();
     tree.position.copy(surface(n));
     tree.quaternion.copy(orientation(n));

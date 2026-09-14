@@ -22,6 +22,12 @@ import {
   bigLakeRadius,
   roadOffset,
   islandDistance,
+  bigLakeNormal,
+  bigLakeChart,
+  MOUNTAIN,
+  streamPoint,
+  relief,
+  mountainDistance,
 } from '../src/navigation.js';
 import { daylightAt } from '../src/landscape.js';
 
@@ -799,6 +805,92 @@ check('shadows follow the player, fade with the night and bow to the frame-rate 
   for (let i = 0; i < 200 && shadows.enabled; i++) updateWorld((t += 0.05), 0.016, 0.05);
   assert.ok(shadows.guard.settled && shadows.guard.fps < 30);
   assert.ok(!shadows.enabled && !light.castShadow && !renderer.shadowMap.enabled);
+});
+
+check('hills, flat village and tunnel, mountain with a spring and a stream to the lake', () => {
+  assert.equal(relief(normalAt(28, 12)), 0, 'Village stays flat');
+  assert.equal(relief(normalAt(0, 118)), 0, 'Tunnel stays flat');
+  let hilly = 0;
+  for (let i = 0; i < 40; i++)
+    hilly += Math.abs(relief(normalAt(260 * Math.cos(i), 260 * Math.sin(i))));
+  assert.ok(hilly / 40 > 2, 'Rolling hills away from the village');
+  assert.ok(relief(MOUNTAIN) > 25, 'A real mountain');
+  assert.ok(mountainDistance(parts.mountain.pool.position.clone().sub(CENTER).normalize()) < 0.5);
+  let previous = Infinity;
+  for (let i = 0; i <= 10; i++) {
+    const h = relief(streamPoint(i / 10));
+    assert.ok(h < previous + 0.5, 'The stream only runs downhill');
+    previous = h;
+  }
+  assert.ok(bigLakeRadius(streamPoint(1)) < 1, 'The stream reaches the lake');
+  assert.ok(lakeDepth(bigLakeNormal(0, 0)) >= 9.9, 'A deep, wide lake');
+  const arches = parts.landscape.bridgeSamples.length;
+  assert.ok(arches > 100, `A long causeway (${arches} samples)`);
+  assert.ok(parts.clouds.count > 80);
+  parts.clouds.update(0);
+  const q0 = parts.clouds.group.quaternion.clone();
+  parts.clouds.update(100);
+  assert.ok(q0.angleTo(parts.clouds.group.quaternion) > 0.3, 'Clouds drift');
+  assert.equal(parts.post.enabled, false, 'No post pass without WebGL2 (fake renderer)');
+});
+
+check('rowing boat: board from the shore, row, stay on the water, pass under the causeway', () => {
+  const { boat } = parts;
+  game.resetHome();
+  const shore = boat.mooring.clone();
+  game.place({ normal: shore, position: surface(shore, lakeDepth(shore) + 0.24) });
+  game.step(0.016);
+  assert.ok(!s().swimming, 'Wading at the mooring');
+  assert.equal(game.getContext().type, 'boat');
+  assert.equal(game.getContext().text, 'Ramer');
+  game.contextAction();
+  assert.equal(s().mode, 'riding');
+  assert.equal(s().vehicle, 'boat');
+  assert.equal(game.getContext().text, 'Descendre');
+  game.updateHud();
+  assert.ok(!hud('accelerate').hidden && hud('jump').hidden);
+  // Row towards the middle of the lake.
+  const centre = bigLakeNormal(0, 0);
+  game.place({ forward: centre.clone().sub(shore).projectOnPlane(shore).normalize() });
+  game.place({ heading: s().forward });
+  hud('accelerate').pointerdown(touch(90, 750, 250));
+  const start = s().normal.clone();
+  steps(300);
+  assert.ok(s().speed > 10 && s().speed <= 14, 'Rowing speed');
+  assert.ok(start.distanceTo(s().normal) * RADIUS > 30, 'The boat moves');
+  assert.ok(
+    Math.abs(s().position.distanceTo(CENTER) - (RADIUS - 0.24 - 0.55)) < 0.2,
+    'Seated at water level',
+  );
+  assert.ok(Math.abs(boat.root.position.distanceTo(CENTER) - (RADIUS - 0.24)) < 0.1);
+  // Turn back towards the shore: the boat stops in shallow water instead of climbing out.
+  game.place({ forward: shore.clone().sub(s().normal).projectOnPlane(s().normal).normalize() });
+  game.place({ heading: s().forward });
+  steps(600);
+  assert.ok(lakeDepth(s().normal) > 0.3 && bigLakeRadius(s().normal) < 1, 'Never leaves the water');
+  // Cross under the causeway: from one side of the road line to the other, staying on the water.
+  const road = bigLakeChart(parts.landscape.bridgeSamples.find((n) => bigLakeRadius(n) < 0.3));
+  const from = bigLakeNormal(road.x - 20, road.z),
+    across = bigLakeNormal(road.x + 20, road.z);
+  game.place({ normal: from, position: surface(from, lakeDepth(from) + 0.79) });
+  game.place({ forward: across.clone().sub(from).projectOnPlane(from).normalize() });
+  game.place({ heading: s().forward, speed: 12 });
+  for (let i = 0; i < 260; i++) {
+    game.step(0.016);
+    assert.ok(
+      s().position.distanceTo(CENTER) > RADIUS - 2,
+      'Stays at water level under the bridge',
+    );
+  }
+  assert.ok(bigLakeChart(s().normal).x > road.x + 8, 'Passed under the causeway');
+  hud('accelerate').pointerup(touch(90, 750, 250));
+  game.boatAction();
+  game.step(0.016);
+  assert.equal(s().mode, 'swimming', 'Leaving the boat mid-lake means swimming');
+  game.resetHome();
+  assert.ok(
+    boat.root.position.distanceTo(surface(boat.mooring, lakeDepth(boat.mooring) + 0.24)) < 1e-6,
+  );
 });
 
 check('nearby falling leaves and bounded particle pool expires cleanly', () => {

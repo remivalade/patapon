@@ -11,7 +11,9 @@
 - [ ] Speeder au-dessus des deux lacs
 - [ ] Vache et mouton : réaction au toucher, montée, saut, descente
 - [ ] Animal monté : il fonce tout seul, le frein le calme, il repart quand on lâche ; traits de vitesse et galop visibles, fluidité correcte
-- [ ] Pont et île
+- [ ] Pont-chaussée et île ; barque : embarquer à l'embarcadère, ramer, passer sous le pont, descendre au large et nager
+- [ ] Montagne : monter jusqu'à la source, suivre le ruisseau jusqu'au lac ; collines douces agréables à pied et au speeder
+- [ ] Rendu : nuages, couleurs du terrain, lumière chaude/froide, vignettage ; fluidité correcte avec le post-traitement
 - [ ] Ascenseur jusqu'à la salle du soleil et retour
 - [ ] Boîtier du soleil : « Interagir » près du pupitre, vue subjective lisible en portrait et en paysage, les trois boutons répondent au toucher, « Retour » rend la main
 - [ ] Mode disco : coque percée autour du soleil, taches colorées sur tout le monde, fluidité correcte, retour à la normale

@@ -12,11 +12,15 @@ Le terrain est **la face intérieure d'une sphère** : le sol opposé est visibl
 - Speeder avec accélération, décélération et freinage, utilisable au-dessus de l'eau.
 - Conduite par joystick ou inclinaison du téléphone, avec recalibrage.
 - Vaches et moutons interactifs et montables. Ils n'aiment pas ça : une fois en selle, l'animal s'emballe et fonce tout seul, plus vite que le speeder. On le dirige, on freine pour le calmer, on peut sauter. Traits de vitesse, champ de vision élargi et poussière soulignent la course ; l'animal galope avec rebond, tangage et tête tendue.
-- Route circulaire, grand lac à l'opposé de la maison, pont et île arborée.
+- Route circulaire et grand lac à l'opposé de la maison, assez large pour ramer : la route le traverse sur un long pont-chaussée à arches, avec une île arborée au milieu.
+- Une barque amarrée près de l'embarcadère du pont : on rame à la pédale, uniquement sur l'eau, on passe sous le pont, et on peut en descendre au milieu du lac pour nager.
+- Des collines douces hors du village, et une montagne au bord du lac avec une source à son sommet dont le ruisseau descend jusqu'à la rive.
+- Nuages low poly qui dérivent en altitude.
 - Tour de verre et ascenseur vers la salle de contrôle à l'intérieur du soleil.
 - Boîtier de commande du soleil au pied de la tour, à côté du bouton d'appel : en vue subjective, un bouton change la couleur du soleil (le bouton prend la couleur actuelle), un bouton règle la vitesse du cache jour/nuit (arrêt, lent, normal, rapide, très rapide, quatre lampes l'indiquent), et un bouton lance le mode disco : le soleil se retrouve dans une coque percée de trous et le monde entier est éclairé par des taches colorées tournantes.
 - Cache solaire mobile produisant un cycle jour/nuit.
 - Variétés d'arbres, champs de fleurs, papillons, lucioles, vent, poussière, éclaboussures et ambiance sonore.
+- Lumière à deux tons (ciel froid, sol chaud) avec le terrain coloré par l'altitude, la pente, les rives et le lit du ruisseau, et un post-traitement léger (rendu en une passe : tonalité, saturation, vignettage).
 - Ombres portées réelles autour de Marceau : arbres, rochers, cabane, vaisseau, tour, animaux, speeder et personnages projettent des ombres courtes de midi, qui disparaissent côté nuit et en disco. Un garde-fou les coupe si l'appareil ne tient pas 30 images par seconde.
 
 ## Démarrer sur ordinateur
@@ -100,8 +104,12 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 | `src/sun.js`                  | Soleil artificiel : sphère, halo, lueur, poussières, intérieur et palette de couleurs                                                                                                                   |
 | `src/sunpanel.js`             | Boîtier de commande du soleil : pupitre, panneau et trois boutons                                                                                                                                       |
 | `src/shadows.js`              | Ombres portées : lumière directionnelle qui suit le joueur, réglages selon l'appareil, garde-fou de fluidité                                                                                            |
+| `src/post.js`                 | Passe plein écran : tonalité, espace de couleur, saturation, contraste, vignettage                                                                                                                      |
+| `src/mountain.js`             | Source au sommet de la montagne, pierres et ruisseau animé jusqu'au lac                                                                                                                                 |
+| `src/clouds.js`               | Nuages low poly instanciés qui dérivent autour du globe                                                                                                                                                 |
+| `src/boat.js`                 | La barque : modèle, amarrage et animation des rames                                                                                                                                                     |
 | `src/marceau.js`              | Modèle de Marceau et son ombre au sol                                                                                                                                                                   |
-| `src/navigation.js`           | Géométrie sphérique, déplacements, relief, eau, collisions et pont                                                                                                                                      |
+| `src/navigation.js`           | Géométrie sphérique, déplacements, relief (collines, montagne, lit du ruisseau), lacs, collisions et pont                                                                                               |
 | `src/handling.js`             | Réponse des déplacements à pied et des montures : un profil de conduite par monture (`MOUNTS`), accélération et freinage                                                                                |
 | `src/tilt.js`                 | Capteurs d'orientation, permission, calibration et repli vers le joystick                                                                                                                               |
 | `src/expansion.js`            | Modèles et comportement des animaux, speeder et ascenseur                                                                                                                                               |
@@ -125,7 +133,7 @@ Le code du jeu et le moteur 3D sont conservés à l'identique dans `src/`. Seuls
 
 ## Contrôles
 
-Sur téléphone : joystick à gauche pour marcher, glissement sur la partie droite pour regarder, bouton de saut et bouton contextuel près d'un véhicule, d'un animal ou de l'ascenseur. Toucher une vache ou un mouton provoque sa réaction sonore. Sur le speeder, utiliser les pédales à droite ; l'inclinaison se sélectionne avec « Incliner ». Sur un animal, il n'y a pas d'accélérateur : il fonce tout seul, la pédale de frein le ralentit tant qu'on la tient, et le saut reste disponible. Près du boîtier du soleil, le bouton contextuel « Interagir » passe en vue subjective ; on touche les boutons du panneau à l'écran, et « Retour » rend la main.
+Sur téléphone : joystick à gauche pour marcher, glissement sur la partie droite pour regarder, bouton de saut et bouton contextuel près d'un véhicule, d'un animal ou de l'ascenseur. Toucher une vache ou un mouton provoque sa réaction sonore. Sur le speeder, utiliser les pédales à droite ; l'inclinaison se sélectionne avec « Incliner ». Sur un animal, il n'y a pas d'accélérateur : il fonce tout seul, la pédale de frein le ralentit tant qu'on la tient, et le saut reste disponible. Dans la barque, on rame avec la pédale d'accélération et on freine avec l'autre ; elle reste sur l'eau. Près du boîtier du soleil, le bouton contextuel « Interagir » passe en vue subjective ; on touche les boutons du panneau à l'écran, et « Retour » rend la main.
 
 Sur ordinateur : flèches ou touches de déplacement (ZQSD/WASD), espace pour sauter, E pour l'action contextuelle ; cliquer-glisser pour regarder. Sur un animal, S ou flèche bas freine. Devant le boîtier du soleil, E ouvre et ferme la vue, 1, 2 et 3 appuient sur les boutons, Échap referme. Les boutons à l'écran restent utilisables.
 
