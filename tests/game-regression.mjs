@@ -759,6 +759,48 @@ check('hoof dust, landing clouds, speeder grass and water-entry splashes', () =>
   assert.ok(trailEffects.stats.splash >= 22);
 });
 
+check('shadows follow the player, fade with the night and bow to the frame-rate guard', () => {
+  const { shadows, updateWorld } = parts;
+  const { light } = shadows;
+  game.resetHome();
+  assert.ok(shadows.enabled && light.castShadow && renderer.shadowMap.enabled);
+  // Find a moment of full daylight at home (the cover keeps turning at normal speed).
+  let t = 2000;
+  updateWorld(t, 0.016);
+  while (light.shadow.intensity < 0.99 && t < 2200) updateWorld((t += 1), 0.016);
+  assert.ok(light.shadow.intensity > 0.99, 'Full shadows in daylight at home');
+  const up = s().normal.clone().negate();
+  const box = light.target.position.clone().sub(s().position);
+  assert.ok(box.length() < 20 && Math.abs(box.dot(up)) < 0.6, 'Shadow box centred just ahead');
+  const above = light.position.clone().sub(light.target.position);
+  assert.ok(Math.abs(above.length() - 70) < 1e-6 && above.normalize().dot(up) > 0.999, 'Overhead');
+  assert.equal(light.color.getHexString(), parts.sun.colour.light.slice(1));
+  // Standing still, the box does not move: it is snapped to the texel grid.
+  const before = light.target.position.clone();
+  updateWorld(t + 0.016, 0.016);
+  assert.ok(light.target.position.distanceTo(before) < 1e-9);
+  // Night side, half a cycle later: shadows fade out. Back to day a full cycle later.
+  updateWorld(t + 90, 0.016);
+  assert.ok(light.shadow.intensity < 0.01, 'No shadows at night');
+  updateWorld(t + 180, 0.016);
+  assert.ok(light.shadow.intensity > 0.99);
+  // Disco: no shadows either.
+  game.pressPanel('disco');
+  updateWorld(t + 183, 0.016);
+  updateWorld(t + 186, 0.016);
+  assert.ok(light.shadow.intensity < 0.01, 'No shadows under the disco');
+  game.pressPanel('disco');
+  updateWorld(t + 190, 0.016);
+  updateWorld(t + 194, 0.016);
+  assert.ok(light.shadow.intensity > 0.99);
+  // A slow device: 20 fps during the measuring window switches the shadows off.
+  shadows.resetGuard();
+  t += 200;
+  for (let i = 0; i < 200 && shadows.enabled; i++) updateWorld((t += 0.05), 0.016, 0.05);
+  assert.ok(shadows.guard.settled && shadows.guard.fps < 30);
+  assert.ok(!shadows.enabled && !light.castShadow && !renderer.shadowMap.enabled);
+});
+
 check('nearby falling leaves and bounded particle pool expires cleanly', () => {
   const { trailEffects, forest } = parts;
   const state = effectState;

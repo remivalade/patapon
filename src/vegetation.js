@@ -91,6 +91,7 @@ export function buildForest(world, trees, collisions) {
     dummy.updateMatrix();
     trunks.setMatrixAt(i, dummy.matrix);
   });
+  trunks.castShadow = true;
   world.add(trunks);
   const crowns = [];
   for (let kind = 0; kind < 3; kind++) {
@@ -127,6 +128,7 @@ export function buildForest(world, trees, collisions) {
       }
     }
     foliage.computeBoundingSphere();
+    foliage.castShadow = true;
     world.add(foliage);
     crowns.push(foliage);
   }

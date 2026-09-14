@@ -29,7 +29,8 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   const dummy = new T.Object3D();
   const ambient = new T.AmbientLight('#fff0d4', 1.6);
   world.add(ambient);
-  const centralLight = new T.PointLight('#ffe3a4', 3.8, 0, 0);
+  // Part of the sun's light comes from the shadow-casting directional light (world.js).
+  const centralLight = new T.PointLight('#ffe3a4', 1.3, 0, 0);
   centralLight.position.copy(CENTER);
   world.add(centralLight);
   function terrainMesh() {
@@ -157,6 +158,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
     dummy.updateMatrix();
     rocks.setMatrixAt(i, dummy.matrix);
   }
+  rocks.castShadow = true;
   world.add(rocks);
   disk(-29, -15, 25.4, 33.5, 0.08, mat('#cbb78a'));
   const lakeWater = buildWater(world),
@@ -187,7 +189,8 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   world.add(towerGroup);
   const expansion = buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, towerGroup });
   const landscape = buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions });
-  const sun = buildSun({ world, mesh, rand, camera, lights: { ambient, centralLight } });
+  const lights = { ambient, centralLight };
+  const sun = buildSun({ world, mesh, rand, camera, lights });
   const control = new T.Group();
   control.position.set(0, TOWER_HEIGHT, 0);
   towerGroup.add(control);
@@ -271,6 +274,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
     trees,
     forest,
     sunPanel,
+    lights,
     lakeWater,
     distantWater,
     towerGroup,
