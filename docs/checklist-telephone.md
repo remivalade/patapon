@@ -6,6 +6,11 @@
 - [ ] Marche, caméra et saut, en portrait puis en paysage
 - [ ] Collision avec un arbre et un rocher
 - [ ] Nage et sortie du petit lac et du grand lac
+- [ ] Grand lac : les baies et les falaises s'affichent sans trou entre l'eau et la terre ; sauter d'une falaise dans l'eau
+- [ ] Passer en barque sous le pont suspendu au milieu du lac, puis le traverser à pied et en speeder (montée et descente de la bosse)
+- [ ] Voir les bancs de poissons dans le petit lac et le grand lac ; ils s'écartent quand on nage vers eux et brillent côté nuit
+- [ ] Reflets : les arbres, le pont et Marceau se voient dans l'eau, surtout en regardant à ras de la surface ; pas de saccade en marchant le long d'un lac (sinon le reflet se coupe de lui-même)
+- [ ] Ronds dans l'eau : nager et ramer laisse des ondulations qui s'élargissent ; les poissons en surface en font de petits ; rien ne clignote au bord de l'eau
 - [ ] Speeder au joystick : accélération, roue libre, freinage, demi-tour
 - [ ] Speeder à l'inclinaison, avec recentrage
 - [ ] Speeder au-dessus des deux lacs

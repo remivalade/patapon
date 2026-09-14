@@ -10,6 +10,7 @@ import { buildSunPanel } from './sunpanel.js';
 import { buildMountain } from './mountain.js';
 import { buildClouds } from './clouds.js';
 import { buildBoat } from './boat.js';
+import { buildFish } from './fish.js';
 import {
   RADIUS,
   CENTER,
@@ -78,7 +79,12 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
       const big = bigLakeRadius(n),
         small = smallLakeRadius(n),
         shore = Math.min(big, small);
-      color.lerp(sand, 1 - T.MathUtils.smoothstep(Math.abs(shore - 1.02), 0.02, 0.07));
+      // Sand on gentle shores only: a cliff face stays rock down to the water.
+      color.lerp(
+        sand,
+        (1 - T.MathUtils.smoothstep(Math.abs(shore - 1.02), 0.02, 0.07)) *
+          (1 - T.MathUtils.smoothstep(slope, 0.5, 1)),
+      );
       color.lerp(lakeBed, 1 - T.MathUtils.smoothstep(shore, 0.94, 1));
       if (streamDistance(n) < 2.6) color.multiplyScalar(0.82);
       colors.push(color.r, color.g, color.b);
@@ -225,7 +231,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   towerGroup.quaternion.copy(towerQ);
   world.add(towerGroup);
   const expansion = buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, towerGroup });
-  const landscape = buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions });
+  const landscape = buildLandscape({ world, mesh, mat, ball, box, cyl, beam, collisions });
   const lights = { ambient, hemisphere, centralLight };
   const sun = buildSun({ world, mesh, rand, camera, lights });
   const control = new T.Group();
@@ -311,6 +317,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   const mountain = buildMountain({ world, builders, collisions, rand });
   const clouds = buildClouds({ world, rand });
   const boat = buildBoat({ world, builders });
+  const fish = buildFish({ world, rand });
   return {
     trees,
     forest,
@@ -319,6 +326,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
     mountain,
     clouds,
     boat,
+    fish,
     lakeWater,
     distantWater,
     towerGroup,

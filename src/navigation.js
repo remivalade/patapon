@@ -17,7 +17,8 @@ export function chart(n) {
 }
 // Height of the ground above the bare sphere (positive = towards the centre).
 // Flat around the village, the meadow lakes and the tunnel; rolling hills elsewhere; the
-// mountain above the big lake with its spring and stream bed; lakes dug below.
+// mountain above the big lake with its spring and stream bed; cliffs on parts of the big
+// lake's shore; lakes dug below.
 export function relief(n) {
   const distance = Math.acos(T.MathUtils.clamp(-n.y, -1, 1)) * RADIUS;
   let blend = T.MathUtils.smoothstep(distance, 115, 220);
@@ -38,6 +39,7 @@ export function relief(n) {
     island = islandDistance(n);
   const land =
     (hills + mountainHeight(n)) * T.MathUtils.smoothstep(r, 1, 1.14) +
+    cliffHeight(n) +
     2.2 * (1 - T.MathUtils.smoothstep(island, 10, 19));
   return land - lakeDepth(n) - streamBed(n);
 }
@@ -186,12 +188,67 @@ export function bigLakeChart(n) {
     : { x: (n.dot(LAKE_X) / d) * a * RADIUS, z: (n.dot(LAKE_Z) / d) * a * RADIUS };
 }
 // The big lake is wide enough to row across; the road crosses it on a long causeway.
+// Its shoreline wanders around an ellipse: a few sine waves on the angle give bays and
+// headlands. The same waves are compiled into the water shader (SHORE_GLSL), so the water
+// mesh, the terrain and every "am I in the lake" test agree on where the shore is.
 export const LAKE_RX = 175,
   LAKE_RZ = 135;
+export const SHORE_WAVES = [
+  [2, 0.09, 1.9],
+  [3, 0.13, 0.4],
+  [5, 0.07, 2.6],
+  [8, 0.045, 1.1],
+  [13, 0.02, 3.3],
+];
+export const SHORE_GLSL =
+  'float shoreScale(vec2 q){float a=atan(q.y,q.x);return 1.' +
+  SHORE_WAVES.map(([k, amp, phase]) => `+${amp}*sin(${k}.*a+${phase})`).join('') +
+  ';}';
+// Angle around the lake (0 towards +x, positive towards +z) and the shore scale there.
+export function shoreAngle(x, z) {
+  return Math.atan2(z / LAKE_RZ, x / LAKE_RX);
+}
+export function shoreScale(x, z) {
+  const a = shoreAngle(x, z);
+  let s = 1;
+  for (const [k, amp, phase] of SHORE_WAVES) s += amp * Math.sin(k * a + phase);
+  return s;
+}
+// Chart point on the shore (r = 1) or at a fraction r of the way out, at a given angle.
+export function lakeShorePoint(angle, r = 1) {
+  const x = Math.cos(angle) * LAKE_RX,
+    z = Math.sin(angle) * LAKE_RZ,
+    scale = shoreScale(x, z) * r;
+  return { x: x * scale, z: z * scale };
+}
 export function bigLakeRadius(n) {
   if (n.dot(BIG_LAKE) < 0.6) return 10;
   const p = bigLakeChart(n);
-  return Math.hypot(p.x / LAKE_RX, p.z / LAKE_RZ);
+  return Math.hypot(p.x / LAKE_RX, p.z / LAKE_RZ) / shoreScale(p.x, p.z);
+}
+// Cliffs: on two stretches of shore the land stands high and drops straight into the
+// water, then eases back down to the meadows behind. Each stretch is a sector of the
+// lake, kept away from the causeway landings, the boat mooring and the stream mouth.
+export const CLIFFS = [
+  { angle: 0.35, height: 13 },
+  { angle: 3.4, height: 17 },
+];
+export function cliffHeight(n) {
+  const r = bigLakeRadius(n);
+  if (r < 0.97 || r > 1.75) return 0;
+  const p = bigLakeChart(n),
+    a = shoreAngle(p.x, p.z);
+  let amount = 0;
+  for (const cliff of CLIFFS)
+    amount += cliff.height * T.MathUtils.smoothstep(Math.cos(a - cliff.angle), 0.65, 0.92);
+  if (amount === 0) return 0;
+  const crest = 0.85 + 0.15 * Math.sin(a * 17 + 1) * Math.cos(a * 29);
+  return (
+    amount *
+    crest *
+    T.MathUtils.smoothstep(r, 0.99, 1.04) *
+    (1 - T.MathUtils.smoothstep(r, 1.3, 1.75))
+  );
 }
 export const ISLAND_CHART = { x: 58, z: 14 };
 export const ISLAND = bigLakeNormal(ISLAND_CHART.x, ISLAND_CHART.z);
@@ -239,10 +296,18 @@ export function islandDistance(n) {
 export function lakeRadius(n) {
   return Math.min(smallLakeRadius(n), bigLakeRadius(n));
 }
+// Mid-lake the causeway climbs onto a small suspension bridge: the deck rises by SPAN.rise
+// between the two towers (at ±SPAN.half along the road, measured by the lake chart's z),
+// high enough for the boat to pass under with room to spare.
+export const SPAN = { half: 45, rise: 8, ramp: 95 };
+export function spanRise(n) {
+  const z = Math.abs(bigLakeChart(n).z);
+  return SPAN.rise * (1 - T.MathUtils.smoothstep(z, SPAN.half * 0.55, SPAN.ramp));
+}
 export function bridgeHeight(n) {
   const r = bigLakeRadius(n);
   return roadDistance(n) < 5.8 && r < 1.1
-    ? T.MathUtils.smoothstep(1.1 - r, 0, 0.22) * (4 + 5 * Math.max(0, 1 - r))
+    ? T.MathUtils.smoothstep(1.1 - r, 0, 0.22) * (4 + 5 * Math.max(0, 1 - r) + spanRise(n))
     : 0;
 }
 export function roadOffset(n) {

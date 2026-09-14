@@ -21,6 +21,7 @@ export function detectMobile(env = globalThis) {
 export function createShadows({ renderer, world, colour = '#ffe3a4', mobile = detectMobile() }) {
   const size = mobile ? 1024 : 2048;
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.type = mobile ? T.PCFShadowMap : T.PCFSoftShadowMap;
   // Most of the sun's direct light comes from here, so shadows read clearly (about half
   // as bright as sunlit ground once the ambient light is counted).
@@ -51,6 +52,8 @@ export function createShadows({ renderer, world, colour = '#ffe3a4', mobile = de
   // dt: the real frame time, unclamped, for the guard.
   function update({ position, up, forward, daylight, dt, active = true }) {
     if (!enabled) return;
+    // The scene may be drawn more than once per frame (lake reflection): one shadow map per frame.
+    renderer.shadowMap.needsUpdate = true;
     // A stable sideways axis: swap the reference only where the tangent plane tilts a lot.
     const reference = Math.abs(up.y) < 0.8 ? new T.Vector3(0, 1, 0) : new T.Vector3(1, 0, 0);
     across.copy(reference).projectOnPlane(up).normalize();
