@@ -6,6 +6,7 @@
 - [ ] Marche, caméra et saut, en portrait puis en paysage
 - [ ] Collision avec un arbre et un rocher
 - [ ] Nage et sortie du petit lac et du grand lac
+- [ ] Grand lac : les baies et les falaises s'affichent sans trou entre l'eau et la terre ; sauter d'une falaise dans l'eau
 - [ ] Speeder au joystick : accélération, roue libre, freinage, demi-tour
 - [ ] Speeder à l'inclinaison, avec recentrage
 - [ ] Speeder au-dessus des deux lacs

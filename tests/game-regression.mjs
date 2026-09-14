@@ -26,6 +26,10 @@ import {
   bigLakeChart,
   MOUNTAIN,
   streamPoint,
+  lakeShorePoint,
+  BIG_LAKE,
+  cliffHeight,
+  CLIFFS,
   relief,
   mountainDistance,
 } from '../src/navigation.js';
@@ -824,6 +828,27 @@ check('hills, flat village and tunnel, mountain with a spring and a stream to th
   }
   assert.ok(bigLakeRadius(streamPoint(1)) < 1, 'The stream reaches the lake');
   assert.ok(lakeDepth(bigLakeNormal(0, 0)) >= 9.9, 'A deep, wide lake');
+  // The shoreline wanders: bays and headlands, never a plain ellipse.
+  const reach = [];
+  for (let i = 0; i < 72; i++) {
+    const p = lakeShorePoint((i / 36) * Math.PI);
+    reach.push(Math.hypot(p.x, p.z));
+    const n = bigLakeNormal(p.x, p.z);
+    assert.ok(Math.abs(bigLakeRadius(n) - 1) < 0.01, 'Shore points sit on the shore');
+    assert.ok(n.dot(BIG_LAKE) > 0.62, 'The whole shore stays inside the lake chart');
+  }
+  assert.ok(Math.max(...reach) / Math.min(...reach) > 1.5, 'An irregular shoreline');
+  // Cliffs on two stretches of shore: rock rising steeply from the water, gentle elsewhere.
+  for (const cliff of CLIFFS) {
+    const foot = bigLakeNormal(...Object.values(lakeShorePoint(cliff.angle, 0.98))),
+      top = bigLakeNormal(...Object.values(lakeShorePoint(cliff.angle, 1.06)));
+    assert.ok(relief(top) - relief(foot) > 8, 'A cliff face above the water');
+    assert.ok(lakeDepth(foot) > 0, 'Water at the cliff foot');
+  }
+  for (const n of parts.landscape.bridgeSamples)
+    assert.equal(cliffHeight(n), 0, 'No cliff on the causeway');
+  assert.equal(cliffHeight(parts.boat.mooring), 0, 'No cliff at the mooring');
+  assert.equal(cliffHeight(streamPoint(1)), 0, 'No cliff at the stream mouth');
   const arches = parts.landscape.bridgeSamples.length;
   assert.ok(arches > 100, `A long causeway (${arches} samples)`);
   assert.ok(parts.clouds.count > 80);

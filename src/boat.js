@@ -1,8 +1,9 @@
 import * as T from './vendor/three.module.min.js';
-import { bigLakeNormal, surface, orientation, lakeDepth } from './navigation.js';
+import { bigLakeNormal, surface, orientation, lakeDepth, lakeShorePoint } from './navigation.js';
 // A small rowing boat moored at the big lake shore, near the causeway landing. The player
 // rides it like the speeder, but only on water; the boat rocks gently on the waves.
-export const BOAT_MOORING = { x: -22, z: 130 };
+// The mooring sits just off the shore, whatever shape the shoreline takes there.
+export const BOAT_MOORING = lakeShorePoint(1.69, 0.97);
 export function buildBoat({ world, builders }) {
   const { mat, mesh, box, ball, cyl, beam } = builders;
   const root = new T.Group();

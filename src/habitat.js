@@ -78,7 +78,12 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
       const big = bigLakeRadius(n),
         small = smallLakeRadius(n),
         shore = Math.min(big, small);
-      color.lerp(sand, 1 - T.MathUtils.smoothstep(Math.abs(shore - 1.02), 0.02, 0.07));
+      // Sand on gentle shores only: a cliff face stays rock down to the water.
+      color.lerp(
+        sand,
+        (1 - T.MathUtils.smoothstep(Math.abs(shore - 1.02), 0.02, 0.07)) *
+          (1 - T.MathUtils.smoothstep(slope, 0.5, 1)),
+      );
       color.lerp(lakeBed, 1 - T.MathUtils.smoothstep(shore, 0.94, 1));
       if (streamDistance(n) < 2.6) color.multiplyScalar(0.82);
       colors.push(color.r, color.g, color.b);
