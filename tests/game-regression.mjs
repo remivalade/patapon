@@ -893,7 +893,7 @@ check('hills, flat village and tunnel, mountain with a spring and a stream to th
   const m = new T.Matrix4();
   fish.meshes.big.mesh.getMatrixAt(0, m);
   const p = new T.Vector3().setFromMatrixPosition(m);
-  const under = RADIUS - 0.24 - p.distanceTo(CENTER);
+  const under = p.distanceTo(CENTER) - (RADIUS - 0.24);
   assert.ok(under > 0.25 && under < 1.6, `Fish swim just under the surface (${under.toFixed(2)})`);
   fish.update(61, 0.016, null, () => 1);
   assert.ok(fish.meshes.big.glow.value > 1.2, 'Fish glow at night');
@@ -1039,6 +1039,7 @@ check(
       uniforms: {
         reflection: { value: null },
         reflectionMatrix: { value: new T.Matrix4() },
+        mirrorPlane: { value: new T.Vector4() },
         reflectionStrength: { value: 0 },
         ripples: { value: null },
         rippleWindow: { value: new T.Vector4(0, 0, 1, 0) },
@@ -1071,8 +1072,16 @@ check(
       mirror.mirror.getWorldDirection(new T.Vector3()).y > 0,
       'It looks up through the surface',
     );
-    for (const w of waters)
-      assert.ok(w.water.visible, 'The water is shown again after the mirror pass');
+    for (const w of waters) {
+      assert.equal(
+        w.uniforms.reflectionStrength.value,
+        mirror.strength,
+        'Strength restored after the pass',
+      );
+      const plane = w.uniforms.mirrorPlane.value;
+      assert.ok(Math.abs(plane.y * 0.24 + plane.w) < 1e-6, 'The mirror plane lies on the water');
+      assert.ok(plane.y > 0.99, 'Its normal points up');
+    }
     // A point on the water ahead projects inside the mirror picture.
     const projected = new T.Vector4(20, 0.24, 0, 1).applyMatrix4(
       waters[0].uniforms.reflectionMatrix.value,
