@@ -174,7 +174,9 @@ export function buildFish({ world, rand }) {
     school.z += Math.sin(school.heading) * speed * dt;
   }
   // `night(n)` gives the darkness (0 day, 1 night) at a point; fish light up in the dark.
+  const splashes = [];
   function update(t, dt, player = null, night = null) {
+    splashes.length = 0;
     for (const lake of Object.values(meshes)) {
       const dark = night ? night(lake.centre) : 0;
       lake.glow.value = 0.05 + 1.5 * dark;
@@ -204,6 +206,11 @@ export function buildFish({ world, rand }) {
           .normalize();
         const bed = lakeDepth(n);
         const depth = Math.min(f.depth, Math.max(0.3, bed - 0.4));
+        // Now and then a shallow fish breaks the surface: one ring per school every third of a second.
+        if (depth < 0.75 && (i + Math.floor(t * 3)) % school.fish.length === 0) {
+          const c = lake.chart(n);
+          splashes.push({ lake: school.spec.lake, x: c.x, z: c.z });
+        }
         dummy.position
           .copy(n)
           .multiplyScalar(RADIUS - 0.24 - depth)
@@ -221,5 +228,5 @@ export function buildFish({ world, rand }) {
     for (const lake of Object.values(meshes)) lake.mesh.instanceMatrix.needsUpdate = true;
   }
   update(0, 0);
-  return { meshes, schools, count: total, update };
+  return { meshes, schools, count: total, splashes, update };
 }

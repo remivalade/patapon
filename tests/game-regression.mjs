@@ -35,9 +35,13 @@ import {
   CLIFFS,
   relief,
   mountainDistance,
+  LAKE_RX,
+  LAKE_RZ,
 } from '../src/navigation.js';
 import { SCHOOLS } from '../src/fish.js';
 import { daylightAt } from '../src/landscape.js';
+import { createReflection, REFLECTION } from '../src/reflection.js';
+import { createRipples, RIPPLES } from '../src/ripples.js';
 
 const { game, renderer, canvas, hud } = await createTestGame();
 const { parts } = game;
@@ -988,6 +992,145 @@ check('nearby falling leaves and bounded particle pool expires cleanly', () => {
   assert.equal(alive, 0);
   assert.equal(trailEffects.particles.length, 320);
 });
+
+check(
+  'lake mirror and ripples: off without WebGL2, mirrored camera and sliding window with it',
+  () => {
+    const { reflection, ripples, fish, lakeWater, distantWater } = parts;
+    // The fake renderer has no WebGL2: both effects stand down and the water shows its own colours.
+    assert.equal(reflection.enabled, false);
+    assert.equal(ripples.enabled, false);
+    assert.equal(lakeWater.uniforms.reflectionStrength.value, 0);
+    assert.equal(distantWater.uniforms.rippleWindow.value.w, 0);
+    assert.equal(ripples.drop('big', 0, 0, 1, 1), false);
+    game.resetHome();
+    steps(30);
+    // Surfacing fish announce rings inside their own lake.
+    fish.update(1.4, 0.016);
+    assert.ok(fish.splashes.length > 0, 'Some fish break the surface');
+    for (const splash of fish.splashes) {
+      assert.ok(['big', 'small'].includes(splash.lake));
+      const n =
+        splash.lake === 'big' ? bigLakeNormal(splash.x, splash.z) : normalAt(splash.x, splash.z);
+      assert.ok(
+        (splash.lake === 'big' ? bigLakeRadius(n) : lakeRadius(n)) < 1,
+        'A splash sits in its lake',
+      );
+    }
+    // A renderer that claims WebGL2 and float targets: check the maths without a GPU.
+    const calls = { renders: 0, clears: 0 };
+    const stub = {
+      capabilities: { isWebGL2: true },
+      getContext: () => ({ getExtension: () => ({}) }),
+      getDrawingBufferSize: (v) => v.set(1200, 600),
+      getRenderTarget: () => null,
+      setRenderTarget() {},
+      clear() {
+        calls.clears++;
+      },
+      render() {
+        calls.renders++;
+      },
+    };
+    const scene = new T.Scene(),
+      camera = new T.PerspectiveCamera(59, 2, 0.12, 7000);
+    const waterStub = () => ({
+      water: new T.Object3D(),
+      uniforms: {
+        reflection: { value: null },
+        reflectionMatrix: { value: new T.Matrix4() },
+        reflectionStrength: { value: 0 },
+        ripples: { value: null },
+        rippleWindow: { value: new T.Vector4(0, 0, 1, 0) },
+        rippleTexel: { value: 0 },
+        shape: { value: new T.Vector4(0, 0, LAKE_RX, LAKE_RZ) },
+        large: { value: 1 },
+      },
+    });
+    const waters = [waterStub(), waterStub()];
+    const mirror = createReflection({ renderer: stub, scene, camera, waters, mobile: true });
+    assert.ok(mirror.enabled);
+    assert.ok(
+      mirror.target.width <= REFLECTION.maxWidth && mirror.target.width < 1200,
+      'Low-resolution mirror',
+    );
+    // Camera 10 above the water at the south pole of the chart, looking along the surface.
+    const normal = new T.Vector3(0, -1, 0);
+    camera.position.set(0, 10.24, 0);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(30, 8, 0);
+    for (let i = 0; i < 6; i++) mirror.render({ normal, wanted: true, dt: 0.5 });
+    assert.ok(mirror.strength > 0.9, 'The mirror fades in');
+    assert.equal(waters[0].uniforms.reflectionStrength.value, mirror.strength);
+    assert.ok(calls.renders > 0, 'The scene is drawn again for the mirror');
+    assert.ok(
+      Math.abs(mirror.mirror.position.y - (0.24 - 10)) < 1e-6,
+      'Mirrored camera as deep under the water as the camera is above',
+    );
+    assert.ok(
+      mirror.mirror.getWorldDirection(new T.Vector3()).y > 0,
+      'It looks up through the surface',
+    );
+    for (const w of waters)
+      assert.ok(w.water.visible, 'The water is shown again after the mirror pass');
+    // A point on the water ahead projects inside the mirror picture.
+    const projected = new T.Vector4(20, 0.24, 0, 1).applyMatrix4(
+      waters[0].uniforms.reflectionMatrix.value,
+    );
+    const u = projected.x / projected.w,
+      v = projected.y / projected.w;
+    assert.ok(
+      u > 0 && u < 1 && v > 0 && v < 1,
+      `Water ahead lands in the picture (${u.toFixed(2)}, ${v.toFixed(2)})`,
+    );
+    // Away from any lake the mirror fades out and stops drawing.
+    const before = calls.renders;
+    for (let i = 0; i < 12; i++) mirror.render({ normal, wanted: false, dt: 0.5 });
+    assert.equal(mirror.strength, 0);
+    const idle = calls.renders;
+    mirror.render({ normal, wanted: false, dt: 0.5 });
+    assert.equal(calls.renders, idle, 'No draw while faded out');
+    assert.ok(before > 0);
+    // The frame-rate guard switches the mirror off on a slow device.
+    mirror.resetGuard();
+    for (let i = 0; i < 200; i++) mirror.render({ normal, wanted: true, dt: 0.05 });
+    assert.ok(mirror.guard.settled && mirror.guard.fps < REFLECTION.guard.minimumFps);
+    assert.equal(mirror.enabled, false);
+    assert.equal(mirror.strength, 0);
+    // Ripples: a window around the player that wakes, slides by whole texels and sleeps.
+    const sim = createRipples({
+      renderer: stub,
+      waters: { big: waters[0], small: waters[1] },
+      mobile: true,
+    });
+    assert.ok(sim.enabled);
+    assert.equal(sim.size, RIPPLES.mobileSize);
+    assert.equal(sim.drop('big', 0, 0, 1, 0.1), false, 'No rings while the lake sleeps');
+    const renders = calls.renders;
+    sim.update({ big: { x: 10, z: -20 }, small: null });
+    assert.equal(calls.clears, 2, 'Both height targets start clean');
+    assert.ok(calls.renders > renders, 'One simulation step');
+    assert.deepEqual(sim.lakes.big.centre, { x: 10, z: -20 });
+    assert.equal(waters[0].uniforms.rippleWindow.value.w, 1);
+    assert.equal(waters[1].uniforms.rippleWindow.value.w, 0);
+    assert.ok(waters[0].uniforms.ripples.value, 'The water reads the height field');
+    assert.equal(sim.drop('big', 12, -18, 1, 0.1), true);
+    assert.equal(sim.drop('big', 10 + RIPPLES.window, -20, 1, 0.1), false, 'Outside the window');
+    assert.equal(sim.drop('small', 0, 0, 1, 0.1), false, 'The sleeping lake refuses');
+    const dropRenders = calls.renders;
+    sim.update({ big: { x: 10, z: -20 }, small: null });
+    assert.equal(calls.renders, dropRenders + 2, 'A step and a drop pass');
+    // Walk further than the recentre distance: the window follows by whole texels.
+    sim.update({ big: { x: 10 + RIPPLES.recentre + 5, z: -20 }, small: null });
+    const texel = RIPPLES.window / RIPPLES.mobileSize;
+    const moved = sim.lakes.big.centre.x - 10;
+    assert.ok(Math.abs(moved - (RIPPLES.recentre + 5)) < texel, 'The window caught up');
+    assert.ok(Math.abs(moved / texel - Math.round(moved / texel)) < 1e-6, 'By whole texels');
+    sim.update({});
+    assert.equal(waters[0].uniforms.rippleWindow.value.w, 0, 'Asleep again away from the lake');
+    assert.equal(sim.lakes.big.active, false);
+  },
+);
 
 for (const { name, run } of checks) {
   try {

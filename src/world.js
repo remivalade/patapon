@@ -12,6 +12,8 @@ import { buildHabitat } from './habitat.js';
 import { buildMarceau } from './marceau.js';
 import { createShadows } from './shadows.js';
 import { createPost } from './post.js';
+import { createReflection } from './reflection.js';
+import { createRipples } from './ripples.js';
 import {
   RADIUS,
   CENTER,
@@ -97,6 +99,20 @@ export function createGame({ renderer }) {
   lights.shadowLight = shadows.light;
   // One full-screen pass: tone mapping, grade and vignette.
   const post = createPost({ renderer, mobile: shadows.mobile });
+  // The lakes mirror the world: one extra low-resolution draw per frame near a lake.
+  const reflection = createReflection({
+    renderer,
+    scene,
+    camera,
+    waters: [lakeWater, distantWater],
+    mobile: shadows.mobile,
+  });
+  // Ripples that spread across the water near the player.
+  const ripples = createRipples({
+    renderer,
+    waters: { small: lakeWater, big: distantWater },
+    mobile: shadows.mobile,
+  });
   function updateSunEffects(t) {
     sun.update(t, dayNight.direction.value, dayNight.disco.value);
   }
@@ -275,6 +291,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.65));
     renderer.setSize(innerWidth, innerHeight);
     post.resize();
+    reflection.resize();
   }
   addEventListener('resize', resize);
   if (window.visualViewport) visualViewport.addEventListener('resize', resize);
@@ -1182,6 +1199,19 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     const far = bigLakeChart(navNormal);
     distantWater.uniforms.swimmer.value.set(far.x, far.z);
     distantWater.uniforms.wake.value = lakeWater.uniforms.wake.value;
+    // Rings from a swimmer or a moving boat, in whichever lake the player is in.
+    const onWater =
+      (swimming || mountedVehicle === 'boat') && bridgeHeight(navNormal) < 0.1
+        ? lakeRadius(navNormal) < 1.05
+          ? { key: 'small', x: p.x, z: p.z }
+          : bigLakeRadius(navNormal) < 1.05
+            ? { key: 'big', x: far.x, z: far.z }
+            : null
+        : null;
+    if (onWater) {
+      const stroke = swimming ? 0.35 + moving * 0.65 : Math.min(1, Math.abs(drive.speed) / 10);
+      ripples.drop(onWater.key, onWater.x, onWater.z, swimming ? 1.6 : 2.2, 0.02 * stroke);
+    }
     setRush(rush);
     updateCamera(dt);
     updateHud();
@@ -1233,7 +1263,22 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       updateCamera(dt);
       if (u >= 7) beginWalk();
     } else move(dt);
-    if (world.visible) updateWorld(t, dt, real);
+    if (world.visible) {
+      updateWorld(t, dt, real);
+      ripples.update(
+        phase === 'walk'
+          ? {
+              small: lakeRadius(navNormal) < 2.4 ? chart(navNormal) : null,
+              big: bigLakeRadius(navNormal) < 1.5 ? bigLakeChart(navNormal) : null,
+            }
+          : {},
+      );
+      reflection.render({
+        normal: navNormal,
+        wanted: phase === 'walk' && (lakeRadius(navNormal) < 2.4 || bigLakeRadius(navNormal) < 1.5),
+        dt: real,
+      });
+    }
     post.render(scene, camera);
   }
   // Everything that lives in the habitat advances here, after the player has moved.
@@ -1247,6 +1292,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     fish.update(t, dt, swimming || mountedVehicle === 'boat' ? navNormal : null, (n) =>
       Math.max(1 - daylightAt(n, dayNight.direction.value), dayNight.disco.value),
     );
+    for (const splash of fish.splashes) ripples.drop(splash.lake, splash.x, splash.z, 0.7, 0.02);
     shadows.update({
       position: player.position,
       up: activeUp(),
@@ -1389,6 +1435,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       shadows,
       lights,
       post,
+      reflection,
+      ripples,
       boat,
       fish,
       clouds,
