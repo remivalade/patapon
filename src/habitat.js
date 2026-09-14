@@ -71,7 +71,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
       color.setHSL(
         0.205 + patch * 0.025 - high * 0.012,
         0.33 + patch * 0.07 + high * 0.04,
-        0.39 + patch * 0.06 + high * 0.07,
+        0.39 + patch * 0.06 + high * 0.04,
       );
       color.lerp(rocky, T.MathUtils.smoothstep(slope, 0.5, 1));
       color.lerp(summit, T.MathUtils.smoothstep(h, 21, 28));

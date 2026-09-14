@@ -95,7 +95,8 @@ export function buildMountain({ world, builders, collisions, rand }) {
         .clone()
         .addScaledVector(side, (sign * width) / 2 / 260)
         .normalize();
-      positions.push(...surface(edge, 0.22).toArray());
+      // The ribbon dips under the lake surface at the mouth instead of floating on it.
+      positions.push(...surface(edge, 0.22 - 0.7 * T.MathUtils.smoothstep(t, 0.86, 1)).toArray());
       uvs.push(sign > 0 ? 1 : 0, t * (STREAM_LENGTH / 6));
     }
     if (i < segments) {

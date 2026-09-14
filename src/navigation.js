@@ -216,7 +216,7 @@ export const STREAM_LENGTH = 62;
 export function streamPoint(t) {
   const shoreX = 45,
     shoreZ = -127;
-  const x = MOUNTAIN_CHART.x + (shoreX - MOUNTAIN_CHART.x) * t + 5 * Math.sin(t * Math.PI * 2.2),
+  const x = MOUNTAIN_CHART.x + (shoreX - MOUNTAIN_CHART.x) * t + 4 * Math.sin(t * Math.PI * 1.4),
     z = MOUNTAIN_CHART.z + 3 + (shoreZ - MOUNTAIN_CHART.z - 3) * t;
   return bigLakeNormal(x, z);
 }

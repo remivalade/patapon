@@ -52,7 +52,7 @@ export function createGame({ renderer }) {
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = T.SRGBColorSpace;
   renderer.toneMapping = T.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.1;
   $('world').appendChild(renderer.domElement);
   const scene = new T.Scene();
   scene.background = new T.Color('#0b1323');
