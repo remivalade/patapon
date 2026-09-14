@@ -858,8 +858,18 @@ check('hills, flat village and tunnel, mountain with a spring and a stream to th
   const clearance = lakeDepth(middle) + bridgeHeight(middle) - (lakeDepth(middle) - 0.24);
   assert.ok(clearance > 14, `Room under the span (${clearance.toFixed(1)})`);
   assert.ok(spanRise(middle) > 7.5 && spanRise(parts.boat.mooring) === 0, 'The rise is local');
-  const towers = parts.landscape.towers;
+  const { towers, tops, cable } = parts.landscape.suspension;
   assert.equal(towers.length, 4, 'Two towers, two legs each');
+  // Golden Gate order: deck above the water, cable never below the deck, towers far above.
+  const above = (p) => RADIUS - p.distanceTo(CENTER);
+  const deckMiddle = above(surface(middle, lakeDepth(middle) + bridgeHeight(middle)));
+  for (const top of tops) assert.ok(above(top) > deckMiddle + 15, 'Towers rise above the deck');
+  for (const { point, deck } of cable)
+    assert.ok(above(point) > above(deck) + 0.5, 'The cable stays above the deck');
+  assert.ok(
+    Math.max(...cable.map((c) => above(c.point))) > deckMiddle + 18,
+    'The cable climbs to the towers',
+  );
   for (const n of parts.landscape.bridgeSamples)
     if (Math.abs(bigLakeChart(n).z) < SPAN.half)
       assert.ok(!parts.landscape.piers.includes(n), 'No pier under the span');
@@ -877,10 +887,14 @@ check('hills, flat village and tunnel, mountain with a spring and a stream to th
   for (let i = 0; i < 40; i++) fish.update(60 + i * 0.05, 0.05, swimmer);
   assert.ok(school.x < before.x - 2, 'The school darts away from the swimmer');
   const m = new T.Matrix4();
-  fish.mesh.getMatrixAt(0, m);
+  fish.meshes.big.mesh.getMatrixAt(0, m);
   const p = new T.Vector3().setFromMatrixPosition(m);
   const under = RADIUS - 0.24 - p.distanceTo(CENTER);
   assert.ok(under > 0.25 && under < 1.6, `Fish swim just under the surface (${under.toFixed(2)})`);
+  fish.update(61, 0.016, null, () => 1);
+  assert.ok(fish.meshes.big.glow.value > 1.2, 'Fish glow at night');
+  fish.update(61, 0.016, null, () => 0);
+  assert.ok(fish.meshes.big.glow.value < 0.1, 'Fish do not glow by day');
   assert.equal(cliffHeight(parts.boat.mooring), 0, 'No cliff at the mooring');
   assert.equal(cliffHeight(streamPoint(1)), 0, 'No cliff at the stream mouth');
   const arches = parts.landscape.bridgeSamples.length;

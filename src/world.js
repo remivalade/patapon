@@ -2,7 +2,7 @@ import * as T from './vendor/three.module.min.js';
 import { createAmbience } from './audio.js';
 import { SpeederHandling, WalkHandling, radialInput, MOUNTS } from './handling.js';
 import { TiltSteering } from './tilt.js';
-import { buildDayNight, COVER_SPEEDS } from './landscape.js';
+import { buildDayNight, COVER_SPEEDS, daylightAt } from './landscape.js';
 import { PANEL_STAND, PANEL_FOCUS } from './sunpanel.js';
 import { buildFields, addWind, windTime } from './vegetation.js';
 import { buildTrailEffects, buildNightDetails } from './effects.js';
@@ -1244,7 +1244,9 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     mountain.update(t);
     boat.animate(t, mountedVehicle === 'boat' && Math.abs(drive.speed) > 0.5);
     // Fish scatter from a swimmer or a boat; someone on the bridge does not worry them.
-    fish.update(t, dt, swimming || mountedVehicle === 'boat' ? navNormal : null);
+    fish.update(t, dt, swimming || mountedVehicle === 'boat' ? navNormal : null, (n) =>
+      Math.max(1 - daylightAt(n, dayNight.direction.value), dayNight.disco.value),
+    );
     shadows.update({
       position: player.position,
       up: activeUp(),

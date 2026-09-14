@@ -14,7 +14,7 @@ Le terrain est **la face intérieure d'une sphère** : le sol opposé est visibl
 - Vaches et moutons interactifs et montables. Ils n'aiment pas ça : une fois en selle, l'animal s'emballe et fonce tout seul, plus vite que le speeder. On le dirige, on freine pour le calmer, on peut sauter. Traits de vitesse, champ de vision élargi et poussière soulignent la course ; l'animal galope avec rebond, tangage et tête tendue.
 - Route circulaire et grand lac à l'opposé de la maison, assez large pour ramer : rives découpées en baies et en caps, deux côtes de falaises qui tombent dans l'eau, la route le traverse sur un long pont-chaussée à arches qui s'élève au milieu du lac sur un petit pont suspendu à deux tours rouges, assez haut pour passer dessous en barque, avec une île arborée à côté.
 - Une barque amarrée près de l'embarcadère du pont : on rame à la pédale, uniquement sur l'eau, on passe sous le pont suspendu, et on peut en descendre au milieu du lac pour nager.
-- Des bancs de poissons colorés qui se promènent sous la surface des deux lacs et s'enfuient quand on nage ou rame vers eux.
+- Des bancs de poissons colorés qui se promènent sous la surface des deux lacs, s'enfuient quand on nage ou rame vers eux, et deviennent lumineux la nuit.
 - Des collines douces hors du village, et une montagne au bord du lac avec une source à son sommet dont le ruisseau descend jusqu'à la rive.
 - Nuages low poly qui dérivent en altitude.
 - Tour de verre et ascenseur vers la salle de contrôle à l'intérieur du soleil.

@@ -96,28 +96,42 @@ export function buildFish({ world, rand }) {
       fish,
     };
   });
-  const total = schools.reduce((sum, s) => sum + s.fish.length, 0);
-  const mesh = new T.InstancedMesh(
-    fishGeometry(),
-    new T.MeshStandardMaterial({
+  // One instanced mesh per lake, so each lake's fish can glow with its own night. The
+  // instance colour gives every fish its tint; at night the same colour becomes light.
+  const meshes = {};
+  for (const key of Object.keys(LAKES)) {
+    const members = schools.filter((s) => s.lake === LAKES[key]);
+    const count = members.reduce((sum, s) => sum + s.fish.length, 0);
+    const glow = { value: 0 };
+    const material = new T.MeshStandardMaterial({
       roughness: 0.55,
       metalness: 0.15,
       flatShading: true,
-      emissive: '#ffffff',
-      emissiveIntensity: 0.1,
-    }),
-    total,
-  );
-  mesh.castShadow = mesh.receiveShadow = false;
-  mesh.frustumCulled = false;
-  let index = 0;
-  const colour = new T.Color();
-  for (const school of schools) {
-    school.first = index;
-    colour.set(school.spec.colour);
-    for (let i = 0; i < school.fish.length; i++) mesh.setColorAt(index++, colour);
+    });
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.glow = glow;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', 'uniform float glow;\n#include <common>')
+        .replace(
+          '#include <emissivemap_fragment>',
+          '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * glow;',
+        );
+    };
+    const mesh = new T.InstancedMesh(fishGeometry(), material, count);
+    mesh.castShadow = mesh.receiveShadow = false;
+    mesh.frustumCulled = false;
+    let index = 0;
+    const colour = new T.Color();
+    for (const school of members) {
+      school.mesh = mesh;
+      school.first = index;
+      colour.set(school.spec.colour);
+      for (let i = 0; i < school.fish.length; i++) mesh.setColorAt(index++, colour);
+    }
+    world.add(mesh);
+    meshes[key] = { mesh, glow, centre: LAKES[key].normal(LAKES[key].home.x, LAKES[key].home.z) };
   }
-  world.add(mesh);
+  const total = schools.reduce((sum, s) => sum + s.fish.length, 0);
   const dummy = new T.Object3D(),
     up = new T.Vector3(),
     forward = new T.Vector3(),
@@ -159,7 +173,12 @@ export function buildFish({ world, rand }) {
     school.x += Math.cos(school.heading) * speed * dt;
     school.z += Math.sin(school.heading) * speed * dt;
   }
-  function update(t, dt, player = null) {
+  // `night(n)` gives the darkness (0 day, 1 night) at a point; fish light up in the dark.
+  function update(t, dt, player = null, night = null) {
+    for (const lake of Object.values(meshes)) {
+      const dark = night ? night(lake.centre) : 0;
+      lake.glow.value = 0.05 + 1.5 * dark;
+    }
     for (const school of schools) {
       steer(school, t, dt, player);
       const { lake } = school;
@@ -196,11 +215,11 @@ export function buildFish({ world, rand }) {
         dummy.quaternion.premultiply(yaw);
         dummy.scale.setScalar(f.scale);
         dummy.updateMatrix();
-        mesh.setMatrixAt(school.first + i, dummy.matrix);
+        school.mesh.setMatrixAt(school.first + i, dummy.matrix);
       });
     }
-    mesh.instanceMatrix.needsUpdate = true;
+    for (const lake of Object.values(meshes)) lake.mesh.instanceMatrix.needsUpdate = true;
   }
   update(0, 0);
-  return { mesh, schools, count: total, update };
+  return { meshes, schools, count: total, update };
 }
