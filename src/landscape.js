@@ -9,6 +9,8 @@ import {
   surface,
   lakeDepth,
   bigLakeRadius,
+  bigLakeChart,
+  SPAN,
   bridgeHeight,
   ISLAND,
   ISLAND_CHART,
@@ -47,8 +49,9 @@ float h=fract(sin(dot(vec2(col,row),vec2(127.1,311.7)))*43758.5453);
 vec3 colour=.55+.45*cos(6.2832*(h+vec3(0.,.33,.67)));
 return colour*spot;}`;
 
-export function buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions }) {
+export function buildLandscape({ world, mesh, mat, ball, box, cyl, beam, collisions }) {
   const bridgeSamples = [],
+    piers = [],
     lamps = [],
     scenery = new T.Group();
   world.add(scenery);
@@ -60,8 +63,11 @@ export function buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions }
     if (bigLakeRadius(n) > 1.04 || h < 0.3) continue;
     bridgeSamples.push(n);
     const q = orientation(n),
-      base = surface(n, lakeDepth(n) + h);
-    if (i % 3 === 0) {
+      base = surface(n, lakeDepth(n) + h),
+      along = Math.abs(bigLakeChart(n).z);
+    // No piers under the suspended span: the boat passes anywhere between the towers.
+    if (i % 3 === 0 && along > SPAN.half) {
+      piers.push(n);
       const pier = new T.Group();
       pier.position.copy(base);
       pier.quaternion.copy(q);
@@ -96,6 +102,7 @@ export function buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions }
       }
     }
   }
+  const towers = buildSuspension({ scenery, bridgeSamples, cyl, box, beam });
   // A handful of distinct low-poly trees on the raised island.
   const islandTrees = [
     [0, 0, 1.25],
@@ -117,7 +124,92 @@ export function buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions }
     collisions.add(n, 0.6 * s, 9 * s);
   }
   batchStatic(scenery);
-  return { bridgeSamples, island: ISLAND, lamps };
+  return { bridgeSamples, piers, towers, island: ISLAND, lamps };
+}
+
+// A small suspension bridge over the middle of the causeway: two orange towers either
+// side of the road, a main cable per side sagging between them and anchored to the deck
+// beyond, and vertical hangers holding the deck. Purely decorative; the road surface
+// itself is raised by spanRise() in navigation.js.
+function buildSuspension({ scenery, bridgeSamples, cyl, box, beam }) {
+  const orange = '#e2582b',
+    towerTop = 22,
+    edgeOffset = 6.3,
+    reach = SPAN.half + 42;
+  const edgeAt = (n, sign) =>
+    n
+      .clone()
+      .multiplyScalar(Math.cos(edgeOffset / RADIUS))
+      .addScaledVector(ROAD_AXIS, Math.sin((sign * edgeOffset) / RADIUS));
+  const deckAt = (edge) => lakeDepth(edge) + bridgeHeight(edge);
+  // Cable height above the deck: a parabola between the towers, straight stays outside.
+  const cableAt = (z) => {
+    const a = Math.abs(z);
+    if (a <= SPAN.half) return 1.6 + (towerTop - 1.6) * (a / SPAN.half) ** 2;
+    return Math.max(0.6, towerTop * (1 - (a - SPAN.half) / (reach - SPAN.half)));
+  };
+  const span = bridgeSamples
+    .map((n) => ({ n, z: bigLakeChart(n).z }))
+    .filter((s) => Math.abs(s.z) < reach);
+  const towers = [];
+  if (span.length < 4) return towers;
+  for (const sign of [-1, 1]) {
+    // Towers stand on the samples nearest ±SPAN.half.
+    for (const target of [-SPAN.half, SPAN.half]) {
+      const { n } = span.reduce((best, s) =>
+        Math.abs(s.z - target) < Math.abs(best.z - target) ? s : best,
+      );
+      const edge = edgeAt(n, sign),
+        deck = deckAt(edge),
+        foot = new T.Group();
+      foot.position.copy(surface(edge, 0));
+      foot.quaternion.copy(orientation(edge));
+      scenery.add(foot);
+      towers.push(foot);
+      const height = deck + towerTop;
+      box(foot, 0, height / 2, 0, 1.3, height, 1.3, orange);
+      box(foot, 0, height + 0.5, 0, 1.6, 1, 1.6, orange);
+      if (sign === 1) {
+        // Crossbeams tie the two legs above the road.
+        const other = edgeAt(n, -1);
+        for (const lift of [towerTop * 0.45, towerTop * 0.9])
+          beam(
+            scenery,
+            surface(edge, deck + lift).toArray(),
+            surface(other, deckAt(other) + lift).toArray(),
+            0.35,
+            orange,
+          );
+      }
+    }
+    // Main cable and hangers.
+    let previous = null;
+    span.forEach((s, i) => {
+      const edge = edgeAt(s.n, sign),
+        point = surface(edge, deckAt(edge) + cableAt(s.z));
+      if (previous) beam(scenery, previous.toArray(), point.toArray(), 0.14, orange);
+      previous = point;
+      if (i % 2 === 0 && Math.abs(s.z) < SPAN.half - 2)
+        beam(
+          scenery,
+          point.toArray(),
+          surface(edge, deckAt(edge) + 1.3).toArray(),
+          0.05,
+          '#f3c9b4',
+        );
+    });
+    // Anchor blocks where the stays meet the deck.
+    for (const z of [-reach, reach]) {
+      const { n } = span.reduce((best, s) => (Math.abs(s.z - z) < Math.abs(best.z - z) ? s : best));
+      const edge = edgeAt(n, sign),
+        block = new T.Group();
+      block.position.copy(surface(edge, deckAt(edge)));
+      block.quaternion.copy(orientation(edge));
+      scenery.add(block);
+      box(block, 0, 0.6, 0, 1.6, 1.2, 2.4, '#9aa39b');
+    }
+  }
+  return towers;
 }
 
 export function buildDayNight({ world, mesh, mat, beam, scene, waters }) {

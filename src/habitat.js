@@ -10,6 +10,7 @@ import { buildSunPanel } from './sunpanel.js';
 import { buildMountain } from './mountain.js';
 import { buildClouds } from './clouds.js';
 import { buildBoat } from './boat.js';
+import { buildFish } from './fish.js';
 import {
   RADIUS,
   CENTER,
@@ -230,7 +231,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   towerGroup.quaternion.copy(towerQ);
   world.add(towerGroup);
   const expansion = buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, towerGroup });
-  const landscape = buildLandscape({ world, mesh, mat, ball, cyl, beam, collisions });
+  const landscape = buildLandscape({ world, mesh, mat, ball, box, cyl, beam, collisions });
   const lights = { ambient, hemisphere, centralLight };
   const sun = buildSun({ world, mesh, rand, camera, lights });
   const control = new T.Group();
@@ -316,6 +317,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
   const mountain = buildMountain({ world, builders, collisions, rand });
   const clouds = buildClouds({ world, rand });
   const boat = buildBoat({ world, builders });
+  const fish = buildFish({ world, rand });
   return {
     trees,
     forest,
@@ -324,6 +326,7 @@ export function buildHabitat({ world, builders, rand, collisions, camera }) {
     mountain,
     clouds,
     boat,
+    fish,
     lakeWater,
     distantWater,
     towerGroup,

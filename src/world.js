@@ -89,6 +89,7 @@ export function createGame({ renderer }) {
     mountain,
     clouds,
     boat,
+    fish,
   } = habitat;
   const { solarMat, halo, innerSun, sunCage, sunInteriorUniforms } = sun;
   // Real shadows: one directional light following Marceau; its colour follows the sun.
@@ -1242,6 +1243,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
     clouds.update(t);
     mountain.update(t);
     boat.animate(t, mountedVehicle === 'boat' && Math.abs(drive.speed) > 0.5);
+    // Fish scatter from a swimmer or a boat; someone on the bridge does not worry them.
+    fish.update(t, dt, swimming || mountedVehicle === 'boat' ? navNormal : null);
     shadows.update({
       position: player.position,
       up: activeUp(),
@@ -1385,6 +1388,7 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
       lights,
       post,
       boat,
+      fish,
       clouds,
       mountain,
       panelStand,

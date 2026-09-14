@@ -28,11 +28,15 @@ import {
   streamPoint,
   lakeShorePoint,
   BIG_LAKE,
+  spanRise,
+  SPAN,
+  bridgeHeight,
   cliffHeight,
   CLIFFS,
   relief,
   mountainDistance,
 } from '../src/navigation.js';
+import { SCHOOLS } from '../src/fish.js';
 import { daylightAt } from '../src/landscape.js';
 
 const { game, renderer, canvas, hud } = await createTestGame();
@@ -847,6 +851,36 @@ check('hills, flat village and tunnel, mountain with a spring and a stream to th
   }
   for (const n of parts.landscape.bridgeSamples)
     assert.equal(cliffHeight(n), 0, 'No cliff on the causeway');
+  // The suspension span: the deck climbs well clear of the water in the middle of the lake.
+  const middle = parts.landscape.bridgeSamples.reduce((best, n) =>
+    Math.abs(bigLakeChart(n).z) < Math.abs(bigLakeChart(best).z) ? n : best,
+  );
+  const clearance = lakeDepth(middle) + bridgeHeight(middle) - (lakeDepth(middle) - 0.24);
+  assert.ok(clearance > 14, `Room under the span (${clearance.toFixed(1)})`);
+  assert.ok(spanRise(middle) > 7.5 && spanRise(parts.boat.mooring) === 0, 'The rise is local');
+  const towers = parts.landscape.towers;
+  assert.equal(towers.length, 4, 'Two towers, two legs each');
+  for (const n of parts.landscape.bridgeSamples)
+    if (Math.abs(bigLakeChart(n).z) < SPAN.half)
+      assert.ok(!parts.landscape.piers.includes(n), 'No pier under the span');
+  // Schools of fish swim in both lakes, stay in the water and flee a swimmer.
+  const { fish } = parts;
+  assert.ok(fish.count > 80 && fish.schools.length === SCHOOLS.length);
+  for (let i = 0; i < 1200; i++) fish.update(i * 0.05, 0.05);
+  for (const school of fish.schools) {
+    const n = school.lake.normal(school.x, school.z);
+    assert.ok(lakeDepth(n) > 0.8, `School stays in deep water (${school.spec.lake})`);
+  }
+  const school = fish.schools[0],
+    before = { x: school.x, z: school.z };
+  const swimmer = school.lake.normal(school.x + 3, school.z);
+  for (let i = 0; i < 40; i++) fish.update(60 + i * 0.05, 0.05, swimmer);
+  assert.ok(school.x < before.x - 2, 'The school darts away from the swimmer');
+  const m = new T.Matrix4();
+  fish.mesh.getMatrixAt(0, m);
+  const p = new T.Vector3().setFromMatrixPosition(m);
+  const under = RADIUS - 0.24 - p.distanceTo(CENTER);
+  assert.ok(under > 0.25 && under < 1.6, `Fish swim just under the surface (${under.toFixed(2)})`);
   assert.equal(cliffHeight(parts.boat.mooring), 0, 'No cliff at the mooring');
   assert.equal(cliffHeight(streamPoint(1)), 0, 'No cliff at the stream mouth');
   const arches = parts.landscape.bridgeSamples.length;

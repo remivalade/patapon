@@ -12,8 +12,9 @@ Le terrain est **la face intérieure d'une sphère** : le sol opposé est visibl
 - Speeder avec accélération, décélération et freinage, utilisable au-dessus de l'eau.
 - Conduite par joystick ou inclinaison du téléphone, avec recalibrage.
 - Vaches et moutons interactifs et montables. Ils n'aiment pas ça : une fois en selle, l'animal s'emballe et fonce tout seul, plus vite que le speeder. On le dirige, on freine pour le calmer, on peut sauter. Traits de vitesse, champ de vision élargi et poussière soulignent la course ; l'animal galope avec rebond, tangage et tête tendue.
-- Route circulaire et grand lac à l'opposé de la maison, assez large pour ramer : rives découpées en baies et en caps, deux côtes de falaises qui tombent dans l'eau, la route le traverse sur un long pont-chaussée à arches, avec une île arborée au milieu.
-- Une barque amarrée près de l'embarcadère du pont : on rame à la pédale, uniquement sur l'eau, on passe sous le pont, et on peut en descendre au milieu du lac pour nager.
+- Route circulaire et grand lac à l'opposé de la maison, assez large pour ramer : rives découpées en baies et en caps, deux côtes de falaises qui tombent dans l'eau, la route le traverse sur un long pont-chaussée à arches qui s'élève au milieu du lac sur un petit pont suspendu à deux tours rouges, assez haut pour passer dessous en barque, avec une île arborée à côté.
+- Une barque amarrée près de l'embarcadère du pont : on rame à la pédale, uniquement sur l'eau, on passe sous le pont suspendu, et on peut en descendre au milieu du lac pour nager.
+- Des bancs de poissons colorés qui se promènent sous la surface des deux lacs et s'enfuient quand on nage ou rame vers eux.
 - Des collines douces hors du village, et une montagne au bord du lac avec une source à son sommet dont le ruisseau descend jusqu'à la rive.
 - Nuages low poly qui dérivent en altitude.
 - Tour de verre et ascenseur vers la salle de contrôle à l'intérieur du soleil.
@@ -106,6 +107,7 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 | `src/shadows.js`              | Ombres portées : lumière directionnelle qui suit le joueur, réglages selon l'appareil, garde-fou de fluidité                                                                                            |
 | `src/post.js`                 | Passe plein écran : tonalité, espace de couleur, saturation, contraste, vignettage                                                                                                                      |
 | `src/mountain.js`             | Source au sommet de la montagne, pierres et ruisseau animé jusqu'au lac                                                                                                                                 |
+| `src/fish.js`                 | Bancs de poissons des deux lacs : un seul maillage instancié, des bancs qui nagent, évitent les rives et fuient le joueur                                                                               |
 | `src/clouds.js`               | Nuages low poly instanciés qui dérivent autour du globe                                                                                                                                                 |
 | `src/boat.js`                 | La barque : modèle, amarrage et animation des rames                                                                                                                                                     |
 | `src/marceau.js`              | Modèle de Marceau et son ombre au sol                                                                                                                                                                   |
@@ -113,7 +115,7 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 | `src/handling.js`             | Réponse des déplacements à pied et des montures : un profil de conduite par monture (`MOUNTS`), accélération et freinage                                                                                |
 | `src/tilt.js`                 | Capteurs d'orientation, permission, calibration et repli vers le joystick                                                                                                                               |
 | `src/expansion.js`            | Modèles et comportement des animaux, speeder et ascenseur                                                                                                                                               |
-| `src/landscape.js`            | Grand lac/pont/île, système de jour/nuit, vitesse du cache et éclairage disco                                                                                                                           |
+| `src/landscape.js`            | Grand lac, pont-chaussée et pont suspendu, île, système de jour/nuit, vitesse du cache et éclairage disco                                                                                               |
 | `src/water.js`                | Rendu et animation de l'eau                                                                                                                                                                             |
 | `src/vegetation.js`           | Variétés d'arbres, prairies fleuries, vent et papillons                                                                                                                                                 |
 | `src/effects.js`              | Particules de déplacement, feuilles, lucioles et détails nocturnes                                                                                                                                      |

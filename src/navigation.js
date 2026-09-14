@@ -296,10 +296,18 @@ export function islandDistance(n) {
 export function lakeRadius(n) {
   return Math.min(smallLakeRadius(n), bigLakeRadius(n));
 }
+// Mid-lake the causeway climbs onto a small suspension bridge: the deck rises by SPAN.rise
+// between the two towers (at ±SPAN.half along the road, measured by the lake chart's z),
+// high enough for the boat to pass under with room to spare.
+export const SPAN = { half: 45, rise: 8, ramp: 95 };
+export function spanRise(n) {
+  const z = Math.abs(bigLakeChart(n).z);
+  return SPAN.rise * (1 - T.MathUtils.smoothstep(z, SPAN.half * 0.55, SPAN.ramp));
+}
 export function bridgeHeight(n) {
   const r = bigLakeRadius(n);
   return roadDistance(n) < 5.8 && r < 1.1
-    ? T.MathUtils.smoothstep(1.1 - r, 0, 0.22) * (4 + 5 * Math.max(0, 1 - r))
+    ? T.MathUtils.smoothstep(1.1 - r, 0, 0.22) * (4 + 5 * Math.max(0, 1 - r) + spanRise(n))
     : 0;
 }
 export function roadOffset(n) {
