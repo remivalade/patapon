@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.min.js';
 import { addWind } from './vegetation.js';
+import { buildFace } from './face.js';
 import {
   RADIUS,
   CENTER,
@@ -117,13 +118,15 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
     root.userData.kind = kind;
     root.add(figure);
     world.add(root);
-    const body = ball(figure, 0, cow ? 1.6 : 1.1, 0, 1, cow ? '#f6f0db' : '#ece6d0', 1);
-    body.scale.set(cow ? 1 : 0.7, cow ? 0.82 : 0.68, cow ? 1.7 : 1.08);
+    // Plush proportions: a round body, a big oval head on a generous muzzle, floppy ears,
+    // short legs and a drawn face. The back stays at the same height so riders sit as before.
+    const body = ball(figure, 0, cow ? 1.5 : 1.0, 0, cow ? 1.1 : 0.9, cow ? '#f6f0db' : '#ece6d0', 1);
+    body.scale.set(cow ? 1 : 0.9, 0.85, cow ? 1.4 : 1.1);
     if (cow) {
       for (const [x, y, z, s] of [
-        [0.86, 1.8, 0.1, 0.48],
-        [-0.83, 1.7, -0.65, 0.5],
-        [0.1, 2.35, -0.45, 0.5],
+        [0.9, 1.7, -0.2, 0.52],
+        [-0.7, 2.2, -0.6, 0.55],
+        [-0.85, 1.4, 0.55, 0.45],
       ]) {
         const p = ball(figure, x, y, z, s, '#4b5047', 0);
         p.scale.set(0.8, 0.7, 1.2);
@@ -131,70 +134,51 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
     } else {
       for (let i = 0; i < 11; i++) {
         const a = (i / 11) * Math.PI * 2;
-        ball(
-          figure,
-          Math.cos(a) * 0.57,
-          1.2 + Math.sin(a) * 0.45,
-          (rand() - 0.5) * 1.45,
-          0.43,
-          '#f5efd9',
-          0,
-        );
+        ball(figure, Math.cos(a) * 0.55, 1.1 + Math.sin(a) * 0.42, (rand() - 0.5) * 1.3, 0.4, '#f5efd9', 0);
       }
     }
-    head.position.set(0, cow ? 1.85 : 1.25, cow ? 1.55 : 1.05);
+    head.position.set(0, cow ? 1.95 : 1.4, cow ? 1.3 : 0.95);
     figure.add(head);
-    const skull = ball(head, 0, 0, 0, cow ? 0.59 : 0.38, cow ? '#f1ead9' : '#68614f', 1);
-    skull.scale.z = 1.25;
-    const muzzle = ball(
-      head,
-      0,
-      -0.22,
-      cow ? 0.49 : 0.3,
-      cow ? 0.42 : 0.26,
-      cow ? '#dba89b' : '#514b40',
-      1,
-    );
-    muzzle.scale.set(1, 0.65, 0.8);
+    const skull = ball(head, 0, 0, 0, cow ? 0.8 : 0.55, cow ? '#f1ead9' : '#7a715c', 1);
+    skull.scale.set(1, cow ? 1.05 : 1.08, 0.95);
+    if (!cow) ball(head, 0, 0.5, -0.08, 0.42, '#f5efd9', 1);
+    const muzzle = new T.Group();
+    muzzle.position.set(0, cow ? -0.45 : -0.3, cow ? 0.65 : 0.42);
+    head.add(muzzle);
+    ball(muzzle, 0, 0, 0, cow ? 0.66 : 0.36, cow ? '#dba89b' : '#8a8068', 1).scale.set(1, 0.7, 0.85);
     for (const sign of [-1, 1]) {
-      const ear = ball(
-        head,
-        sign * (cow ? 0.65 : 0.47),
-        0.07,
-        0,
-        cow ? 0.27 : 0.22,
-        cow ? '#665f50' : '#68614f',
-      );
-      ear.scale.set(1.4, 0.35, 0.65);
-      ball(head, sign * (cow ? 0.4 : 0.25), 0.09, cow ? 0.35 : 0.24, 0.06, '#242d26', 1);
+      if (cow) ball(muzzle, sign * 0.22, 0.12, 0.5, 0.06, '#b07f75', 1);
+      const ear = ball(head, sign * (cow ? 0.9 : 0.62), cow ? 0.1 : 0.02, 0, cow ? 0.32 : 0.22, cow ? '#665f50' : '#7a715c');
+      ear.scale.set(1.5, 0.4, 0.65);
+      ear.rotation.z = sign * (cow ? 0.4 : 0.5);
       if (cow) {
-        const horn = cyl(head, sign * 0.4, 0.58, -0.04, 0.02, 0.1, 0.44, '#ccb991', 5);
-        horn.rotation.z = -sign * 0.3;
+        const horn = cyl(head, sign * 0.45, 0.8, -0.05, 0.02, 0.08, 0.3, '#ccb991', 5);
+        horn.rotation.z = -sign * 0.35;
       }
       for (const zz of [-1, 1]) {
         const leg = new T.Group();
-        leg.position.set(sign * (cow ? 0.65 : 0.45), cow ? 1.15 : 0.8, zz * (cow ? 1.05 : 0.68));
-        cyl(
-          leg,
-          0,
-          -0.45,
-          0,
-          cow ? 0.13 : 0.095,
-          cow ? 0.15 : 0.12,
-          cow ? 0.95 : 0.68,
-          cow ? '#f2e9d4' : '#61594a',
-          5,
-        );
-        box(leg, 0, cow ? -0.94 : -0.76, 0.05, cow ? 0.32 : 0.24, 0.2, 0.35, '#454b40');
+        leg.position.set(sign * (cow ? 0.62 : 0.42), cow ? 0.95 : 0.75, zz * (cow ? 0.9 : 0.62));
+        cyl(leg, 0, cow ? -0.33 : -0.25, 0, cow ? 0.17 : 0.11, cow ? 0.19 : 0.13, cow ? 0.65 : 0.5, cow ? '#f2e9d4' : '#61594a', 5);
+        box(leg, 0, cow ? -0.72 : -0.55, 0.05, cow ? 0.38 : 0.26, 0.2, cow ? 0.42 : 0.3, '#454b40');
         figure.add(leg);
         legs.push(leg);
       }
     }
+    const face = buildFace({
+      builders: { mesh, mat },
+      style: 'plush',
+      parent: head,
+      R: cow ? 0.78 : 0.53,
+      tweak: cow ? { yaw: 0.36, pitch: 0.18, blushColour: '#f0b8b0' } : { yaw: 0.36, pitch: 0.12, sclera: true, blushColour: '#b58a80' },
+      mouthParent: muzzle,
+      mouthR: cow ? 0.56 : 0.3,
+      mouthPitch: -0.3,
+    });
     beam(
       figure,
-      [0, cow ? 1.9 : 1.4, cow ? -1.7 : -1],
-      [0, cow ? 0.9 : 0.9, cow ? -1.95 : -1.3],
-      cow ? 0.06 : 0.1,
+      [0, cow ? 1.8 : 1.3, cow ? -1.45 : -1],
+      [0, 0.95, cow ? -1.7 : -1.25],
+      cow ? 0.07 : 0.1,
       cow ? '#ac9d80' : '#e2d8bf',
     );
     const a = {
@@ -202,6 +186,7 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
       figure,
       head,
       legs,
+      face,
       kind,
       x,
       z,
@@ -219,6 +204,8 @@ export function buildExpansion({ world, mesh, mat, box, ball, cyl, beam, rand, t
     animal('sheep', -5 + (i % 4) * 11, -24 + Math.floor(i / 4) * 13, i + 5);
   function updateAnimals(t, dt, playerPosition) {
     for (const a of animals) {
+      // Faces live even on the ridden animal: a grin at the gallop, a gasp when bumped.
+      a.face.update(t, a.ridden ? 'joy' : a.reaction > t ? 'surprise' : 'rest');
       if (a.ridden) continue;
       const grazing = a.freeRoam || Math.sin(t * 0.16 + a.index * 2) > 0.05;
       if (!grazing) {

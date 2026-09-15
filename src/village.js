@@ -1,5 +1,6 @@
 import * as T from './vendor/three.module.min.js';
 import { placeOnGlobe } from './builders.js';
+import { buildFace } from './face.js';
 // Patapon's village: stepping stones, log cabin, deck chair, Patapon himself and the parked freighter.
 export function buildVillage({ world, builders, rand }) {
   const { mat, mesh, box, ball, cyl, beam } = builders;
@@ -102,19 +103,33 @@ export function buildVillage({ world, builders, rand }) {
   bear.position.set(0, 1.7, -0.1);
   bear.rotation.x = -0.22;
   chair.add(bear);
-  const body = ball(bear, 0, 1.3, 0, 1.9, '#a97945', 1);
-  body.scale.set(0.9, 1.1, 0.7);
+  // Mii proportions for a teddy: a bigger round head on a compact body, ears with a pale
+  // inner disc, a drawn face whose mouth sits on the muzzle.
+  const body = ball(bear, 0, 1.4, 0, 1.75, '#a97945', 1);
+  body.scale.set(0.9, 1.0, 0.72);
   const bearHead = new T.Group();
-  bearHead.position.set(0, 3.35, 0.05);
+  bearHead.position.set(0, 3.5, 0.1);
   bear.add(bearHead);
-  ball(bearHead, 0, 0, 0, 1.35, '#b98950', 1);
-  for (const x of [-0.99, 0.99]) ball(bearHead, x, 0.8, 0, 0.52, '#af7a45', 1);
-  ball(bearHead, 0, -0.36, 1.07, 0.73, '#dbc08b', 1);
-  ball(bearHead, 0, -0.1, 1.63, 0.23, '#3e352c', 1);
-  for (const x of [-0.47, 0.47]) {
-    ball(bearHead, x, 0.27, 1.15, 0.11, '#282d26', 1);
-    ball(bearHead, x - 0.025, 0.31, 1.24, 0.035, '#fff6d7');
+  ball(bearHead, 0, 0, 0, 1.5, '#b98950', 1);
+  for (const x of [-1.1, 1.1]) {
+    ball(bearHead, x, 1.0, 0, 0.55, '#af7a45', 1);
+    ball(bearHead, x, 1.0, 0.3, 0.28, '#dbc08b', 1);
   }
+  const muzzle = new T.Group();
+  muzzle.position.set(0, -0.45, 1.2);
+  bearHead.add(muzzle);
+  ball(muzzle, 0, 0, 0, 0.68, '#dbc08b', 1).scale.set(1, 0.7, 0.8);
+  ball(muzzle, 0, 0.12, 0.55, 0.22, '#3e352c', 1);
+  const bearFace = buildFace({
+    builders,
+    style: 'mii',
+    parent: bearHead,
+    R: 1.5,
+    tweak: { pitch: 0.1, blushColour: '#c9906a' },
+    mouthParent: muzzle,
+    mouthR: 0.56,
+    mouthPitch: -0.3,
+  });
   const bearArms = [];
   for (const x of [-1.5, 1.5]) {
     const pivot = new T.Group();
@@ -157,6 +172,7 @@ export function buildVillage({ world, builders, rand }) {
         : Math.sin(t * 0.12) * 0.12;
     bearHead.rotation.y = T.MathUtils.lerp(bearHead.rotation.y, target, 1 - Math.exp(-dt * 3));
     bearHead.rotation.x = Math.sin(t * 0.65) * 0.025;
+    bearFace.update(t, waving ? 'joy' : 'rest');
   }
   cyl(world, 46, 1, 6, 1.2, 1.2, 0.18, '#977145');
   cyl(world, 46, 0.5, 6, 0.18, 0.18, 1, '#886341');
