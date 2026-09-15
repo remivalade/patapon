@@ -8,7 +8,7 @@ Le terrain est **la face intérieure d'une sphère** : le sol opposé est visibl
 
 - Approche extérieure dans un champ d'astéroïdes, puis entrée dans l'habitat.
 - Maison de Patapon, vaisseau garé à proximité, promenade sur tout le globe.
-- Personnages mignons : grosses têtes, visages dessinés à plat comme des Mii (yeux, sourcils, joues, sourire), clignement des yeux, et des réactions : bouche ronde de surprise au saut, grand sourire dans l'eau ou sur un animal, Patapon ravi quand il salue, l'animal surpris quand on le touche. La recherche visuelle qui a mené à ce choix est dans `docs/recherche-personnages/`.
+- Personnages mignons : grosses têtes, visages dessinés à plat comme des Mii (yeux, sourcils, joues, sourire), clignement des yeux, et des réactions : bouche ronde de surprise au saut, grand sourire dans l'eau ou sur un animal, Patapon ravi quand il salue, l'animal surpris quand on le touche.
 - Collisions avec les arbres et les rochers, saut et nage.
 - Speeder avec accélération, décélération et freinage, utilisable au-dessus de l'eau.
 - Conduite par joystick ou inclinaison du téléphone, avec recalibrage.
