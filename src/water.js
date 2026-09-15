@@ -62,6 +62,7 @@ export function buildWater(world, large = false) {
     // Filled by reflection.js: the mirrored picture, how to project it, and how much to show.
     reflection: { value: null },
     reflectionMatrix: { value: new T.Matrix4() },
+    mirrorPlane: { value: new T.Vector4(0, 1, 0, 0) },
     reflectionStrength: { value: 0 },
     // Filled by ripples.js: the height field, its window (centre, 1/width, on/off), texel size.
     ripples: { value: null },
@@ -73,9 +74,11 @@ export function buildWater(world, large = false) {
     transparent: true,
     depthWrite: false,
     side: T.DoubleSide,
-    vertexShader: `uniform vec4 shape;uniform float large;uniform vec3 shadeDirection;uniform float time;uniform vec3 center;uniform mat4 reflectionMatrix;varying vec2 lake;varying vec3 worldPosition;varying vec4 mirrored;
+    vertexShader: `uniform vec4 shape;uniform float large;uniform vec3 shadeDirection;uniform float time;uniform vec3 center;uniform mat4 reflectionMatrix;uniform vec4 mirrorPlane;varying vec2 lake;varying vec3 worldPosition;varying vec4 mirrored;
 ${SHORE_GLSL}
- void main(){lake=uv;vec2 q=(uv-shape.xy)/shape.zw;float r=length(q)/mix(1.,shoreScale(q),large);float wave=(sin(uv.x*.54+time*.9)*sin(uv.y*.43-time*.65)*.055+sin(uv.x*.2+uv.y*.3+time*.7)*.025)*smoothstep(0.,.2,1.-r);vec3 p=position+normalize(center-position)*wave;worldPosition=p;mirrored=reflectionMatrix*vec4(p,1.);gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,
+ void main(){lake=uv;vec2 q=(uv-shape.xy)/shape.zw;float r=length(q)/mix(1.,shoreScale(q),large);float wave=(sin(uv.x*.54+time*.9)*sin(uv.y*.43-time*.65)*.055+sin(uv.x*.2+uv.y*.3+time*.7)*.025)*smoothstep(0.,.2,1.-r);vec3 p=position+normalize(center-position)*wave;worldPosition=p;
+ // The lake curves up above the mirror plane far away: project the point's own mirror image, so the reflected ray keeps its direction instead of picking up whatever stands above the near water.
+ float above=max(0.,dot(mirrorPlane.xyz,p)+mirrorPlane.w);mirrored=reflectionMatrix*vec4(p-2.*above*mirrorPlane.xyz,1.);gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,
     fragmentShader: `uniform vec4 shape;uniform float large;uniform vec3 shadeDirection;uniform float time;uniform vec3 center;uniform vec2 swimmer;uniform float wake;uniform vec3 mist;uniform float disco;uniform float discoTime;uniform sampler2D reflection;uniform float reflectionStrength;uniform sampler2D ripples;uniform vec4 rippleWindow;uniform float rippleTexel;varying vec2 lake;varying vec3 worldPosition;varying vec4 mirrored;
 ${DISCO_GLSL}
 ${SHORE_GLSL}

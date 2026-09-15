@@ -79,7 +79,7 @@ export function buildFish({ world, rand }) {
         radius: 0.6 + rand() * 2.6,
         angle: rand() * Math.PI * 2,
         spin: 0.25 + rand() * 0.3,
-        depth: 0.5 + rand() * 1,
+        depth: 0.35 + rand() * 0.9,
         phase: rand() * Math.PI * 2,
         scale: spec.length * (0.8 + rand() * 0.4),
       });
@@ -211,9 +211,10 @@ export function buildFish({ world, rand }) {
           const c = lake.chart(n);
           splashes.push({ lake: school.spec.lake, x: c.x, z: c.z });
         }
+        // Below the surface: a larger radius is deeper (up points to the centre).
         dummy.position
           .copy(n)
-          .multiplyScalar(RADIUS - 0.24 - depth)
+          .multiplyScalar(RADIUS - 0.24 + depth)
           .add(CENTER);
         // Face along the school's heading in the surface plane, then wiggle.
         const facing = new T.Matrix4().lookAt(new T.Vector3(), forward.clone().negate(), up);

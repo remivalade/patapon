@@ -62,19 +62,34 @@ export function buildLandscape({ world, mesh, mat, ball, box, cyl, beam, collisi
       h = bridgeHeight(n);
     if (bigLakeRadius(n) > 1.04 || h < 0.3) continue;
     bridgeSamples.push(n);
-    const q = orientation(n),
-      base = surface(n, lakeDepth(n) + h),
-      along = Math.abs(bigLakeChart(n).z);
+    const along = Math.abs(bigLakeChart(n).z);
     // No piers under the suspended span: the boat passes anywhere between the towers.
     if (i % 3 === 0 && along > SPAN.half) {
       piers.push(n);
-      const pier = new T.Group();
-      pier.position.copy(base);
-      pier.quaternion.copy(q);
-      scenery.add(pier);
-      const length = lakeDepth(n) + h;
-      for (const x of [-4.7, 4.7]) cyl(pier, x, -length / 2, 0, 0.44, 0.7, length, '#96a89e', 6);
-      const cross = beam(pier, [-5.5, -0.35, 0], [5.5, -0.35, 0], 0.25, '#7c9489');
+      // Two legs beside the road (rotated about the road's axis, like the railings: the
+      // generic `orientation()` frame is not aligned with the road), from the lake bed to
+      // a little under the deck so their tops never show through the ramp.
+      const legs = [-1, 1].map((sign) =>
+        n
+          .clone()
+          .multiplyScalar(Math.cos(4.4 / RADIUS))
+          .addScaledVector(ROAD_AXIS, Math.sin((sign * 4.4) / RADIUS)),
+      );
+      for (const leg of legs) {
+        const length = lakeDepth(leg) + h - 0.5;
+        const pier = new T.Group();
+        pier.position.copy(surface(leg, lakeDepth(leg) + h - 0.5));
+        pier.quaternion.copy(orientation(leg));
+        scenery.add(pier);
+        cyl(pier, 0, -length / 2, 0, 0.44, 0.7, length, '#96a89e', 6);
+      }
+      const cross = beam(
+        scenery,
+        surface(legs[0], lakeDepth(legs[0]) + h - 0.7).toArray(),
+        surface(legs[1], lakeDepth(legs[1]) + h - 0.7).toArray(),
+        0.25,
+        '#7c9489',
+      );
       cross.castShadow = false;
     }
     for (const sign of [-1, 1]) {

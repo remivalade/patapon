@@ -97,7 +97,14 @@ export function createReflection({ renderer, scene, camera, waters = [], mobile 
     textureMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
     textureMatrix.multiply(mirror.projectionMatrix).multiply(mirror.matrixWorldInverse);
     // Oblique near plane: clip the mirrored view at the water so the lake bed stays out.
-    plane.setFromNormalAndCoplanarPoint(up, point).applyMatrix4(mirror.matrixWorldInverse);
+    for (const water of waters)
+      water.uniforms.mirrorPlane.value.set(up.x, up.y, up.z, -up.dot(point));
+    // Clip a little above the surface: the water itself stays in the mirrored view (so a
+    // grazing reflection meets water, not the lake bed) but never fights the clip plane.
+    plane
+      .setFromNormalAndCoplanarPoint(up, point)
+      .translate(view.copy(up).multiplyScalar(0.3))
+      .applyMatrix4(mirror.matrixWorldInverse);
     clip.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
     const p = mirror.projectionMatrix.elements;
     q.set(
@@ -111,12 +118,13 @@ export function createReflection({ renderer, scene, camera, waters = [], mobile 
     p[6] = clip.y;
     p[10] = clip.z + 1 - 0.003;
     p[14] = clip.w;
-    for (const water of waters) water.water.visible = false;
+    // The water is drawn in the mirror with its plain colour: no picture of itself.
+    for (const water of waters) water.uniforms.reflectionStrength.value = 0;
     const previous = renderer.getRenderTarget();
     renderer.setRenderTarget(target);
     renderer.render(scene, mirror);
     renderer.setRenderTarget(previous);
-    for (const water of waters) water.water.visible = true;
+    for (const water of waters) water.uniforms.reflectionStrength.value = strength;
     if (dt > 0 && !guard.settled) {
       guard.elapsed += dt;
       if (guard.elapsed > REFLECTION.guard.warmup) {
