@@ -116,7 +116,7 @@ export function createGame({ renderer }) {
   function updateSunEffects(t) {
     sun.update(t, dayNight.direction.value, dayNight.disco.value);
   }
-  const { player, robe, legs, arms, playerShadow } = buildMarceau({ world, builders, rand });
+  const { player, legs, arms, face, playerShadow } = buildMarceau({ world, builders, rand });
   let navNormal = normalAt(0, 71),
     forward = new T.Vector3(0, 0, -1).projectOnPlane(navNormal).normalize();
   addWind(mat('#a8b965'), { worldSpace: true });
@@ -1179,7 +1179,8 @@ vec3 pollenNormal=normalize(position-vec3(0.,260.,0.));transformed+=normalize(cr
           : -Math.sin(walk + i * Math.PI) * 0.4 * moving;
       a.rotation.z = swimming ? (i === 0 ? 0.65 : -0.65) : 0;
     });
-    robe.position.y = 0.9;
+    // A gasp in the air, a grin in the water or on an animal, a small smile otherwise.
+    face.update(clock.elapsedTime, jumpHeight > 0.05 ? 'surprise' : swimming || mountedAnimal ? 'joy' : 'rest');
     const up = activeUp();
     // The flat disc only stands in when real shadows are off.
     playerShadow.visible = !swimming && !riding && !shadows.enabled;

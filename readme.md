@@ -8,6 +8,7 @@ Le terrain est **la face intérieure d'une sphère** : le sol opposé est visibl
 
 - Approche extérieure dans un champ d'astéroïdes, puis entrée dans l'habitat.
 - Maison de Patapon, vaisseau garé à proximité, promenade sur tout le globe.
+- Personnages mignons : grosses têtes, visages dessinés à plat comme des Mii (yeux, sourcils, joues, sourire), clignement des yeux, et des réactions : bouche ronde de surprise au saut, grand sourire dans l'eau ou sur un animal, Patapon ravi quand il salue, l'animal surpris quand on le touche. La recherche visuelle qui a mené à ce choix est dans `docs/recherche-personnages/`.
 - Collisions avec les arbres et les rochers, saut et nage.
 - Speeder avec accélération, décélération et freinage, utilisable au-dessus de l'eau.
 - Conduite par joystick ou inclinaison du téléphone, avec recalibrage.
@@ -111,7 +112,8 @@ Si Vercel indique un problème d'auteur de commit, vérifier que l'adresse Git u
 | `src/fish.js`                 | Bancs de poissons des deux lacs : un maillage instancié par lac, des bancs qui nagent, évitent les rives, fuient le joueur et brillent la nuit                                                          |
 | `src/clouds.js`               | Nuages low poly instanciés qui dérivent autour du globe                                                                                                                                                 |
 | `src/boat.js`                 | La barque : modèle, amarrage et animation des rames                                                                                                                                                     |
-| `src/marceau.js`              | Modèle de Marceau et son ombre au sol                                                                                                                                                                   |
+| `src/marceau.js`              | Modèle de Marceau (proportions Mii, visage dessiné) et son ombre au sol                                                                                                                                 |
+| `src/face.js`                 | Visages dessinés partagés : yeux, sourcils, joues, trois bouches, clignement et humeurs (repos, surprise, joie)                                                                                         |
 | `src/navigation.js`           | Géométrie sphérique, déplacements, relief (collines, montagne, lit du ruisseau, falaises), lacs et leur rivage, collisions et pont                                                                      |
 | `src/handling.js`             | Réponse des déplacements à pied et des montures : un profil de conduite par monture (`MOUNTS`), accélération et freinage                                                                                |
 | `src/tilt.js`                 | Capteurs d'orientation, permission, calibration et repli vers le joystick                                                                                                                               |
